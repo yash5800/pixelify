@@ -1,0 +1,25 @@
+/* ============================================================
+   WAIT CAPTION — rotating status line for AI processing overlays
+   Subtle, professional: soft rise + fade, no layout shift.
+   ============================================================ */
+
+@keyframes wait-caption-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.wait-caption-line {
+  animation: wait-caption-fade 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wait-caption-line {
+    animation: none;
+  }
+}

@@ -1,60 +1,54 @@
-# Image Upscaler
+# Pixelify
 
-Browser-only image super-resolution using ONNX Runtime Web. Runs completely client-side with no backend required.
+Free on-device AI photo editor: image super-resolution (upscaler) and neural background removal, running completely client-side with no backend. Built with **Next.js (App Router)** and deployed as a fully static export.
 
 ## Features
 
+- Next.js App Router with file-based routing and static export
 - Drag & drop image upload
 - PNG, JPG, WEBP support
-- Maximum input size: 4096×4096
 - Three upscaler models: Vitality (fast, 4×), Pixel-Dance (balanced, 4×), and Alpha-Satoru (maximum quality, 4×)
-- Chopper AI for instant background removal
+- Chopper AI for instant background removal (Web Worker)
 - WebGPU/WASM runtime with automatic detection
 - Tiled inference for large images
 - Side-by-side before/after comparison slider
+- SEO: per-page metadata, canonical URLs, hreflang alternates, sitemap & robots routes, JSON-LD
 - Download upscaled result as PNG
 
 ## Project Structure
 
 ```
-upscaler/
-├── index.html
-├── package.json         # React, Vite, Tailwind
-├── vite.config.ts       # COOP/COEP headers, port 3000
-├── tsconfig.json
+pixelify/
+├── app/                    # Next.js App Router pages (static export)
+│   ├── layout.tsx          # Root layout, global SEO metadata, AdSense, structured data
+│   ├── page.tsx            # /
+│   ├── upscaler/page.tsx   # /upscaler
+│   ├── bg_remove/page.tsx  # /bg_remove
+│   ├── blogs/page.tsx      # /blogs
+│   ├── blogs/[...path]/    # /blogs/<slug> (en) + /blogs/<lang>/<slug>
+│   ├── about|products|privacy|terms|story|truckbg/page.tsx
+│   ├── not-found.tsx       # 404
+│   ├── sitemap.ts          # /sitemap.xml
+│   └── robots.ts           # /robots.txt
+├── components/             # React UI (home, workspaces, blog, static pages…)
+│   ├── AppProvider.tsx     # Global client state (theme, toasts, AI model machinery, jobs)
+│   ├── views/              # Route-specific client views
+│   ├── blogs/ bgremove/ upscaler/ pages/   # Feature folders
+├── hooks/                  # useONNX, useUpscale
+├── lib/                    # constants.ts (models/presets), bgUtils, seo
+├── types/                  # Shared TypeScript types
+├── services/               # bgRemoverService (Web Worker manager)
+├── workers/                # bgRemover.worker.ts
+├── utils/                  # upscale.ts, imageProcessing, modelCache, notifications
+├── data/posts/             # Blog registry + per-language post files
+├── styles/                 # Global CSS (imported by app/layout.tsx)
+├── public/
+│   ├── models/             # Vitality.onnx, Pixel-Dance.onnx, Alpha-Satoru.onnx
+│   └── …                   # Images, fonts, icons
+├── next.config.mjs         # output: 'export', trailingSlash
 ├── tailwind.config.js
 ├── postcss.config.js
-├── public/
-│   └── models/
-│       ├── Vitality.onnx       # Vitality (~1.9MB, 4×, RGB)
-│       ├── Pixel-Dance.onnx    # Pixel-Dance (~66.9MB, 4×, RGB)
-│       ├── Alpha-Satoru.onnx   # Alpha-Satoru (~67.1MB, 4×, RGB)
-│       └── README.md
-├── libs/
-│   ├── ort-wasm.wasm
-│   └── ort-wasm-simd.wasm
-└── src/
-    ├── main.tsx
-    ├── App.tsx
-    ├── constants.ts        # Model configs, backend detection
-    ├── types.ts
-    ├── hooks/
-    │   ├── useONNX.ts      # ONNX Runtime lifecycle
-    │   ├── useImageFile.ts # File validation & reading
-    │   └── useUpscale.ts   # Multi-pass upscale pipeline
-    ├── utils/
-    │   ├── upscale.ts      # ONNX session + tiled inference
-    │   └── imageProcessing.ts  # Color space conversion
-    └── components/
-        ├── Header.tsx
-        ├── StepIndicator.tsx
-        ├── UploadArea.tsx
-        ├── ImageComparison.tsx  # Before/after slider
-        ├── ControlPanel.tsx
-        ├── ModelInfoPanel.tsx
-        ├── ProgressCard.tsx
-        ├── StatsBar.tsx
-        └── ErrorMessage.tsx
+└── tsconfig.json
 ```
 
 ## Installation
@@ -77,7 +71,7 @@ Open http://localhost:3000
 npm run build
 ```
 
-Output in `dist/` folder.
+Static export ends up in `out/` (prerendered HTML for every route + `/404.html`).
 
 ## Models
 
@@ -90,17 +84,14 @@ Output in `dist/` folder.
 
 ## Deployment
 
-Deploy `dist/` to any static host.
+The site is deployed on **Vercel** as a fully static export. `vercel.json` provides:
 
-### GitHub Pages
+- **AdSense-first header strategy:** COOP/COEP are served **only on `/upscaler` and `/bg_remove`**, the two AI tool routes that need `crossOriginIsolated` for multi-threaded WASM SIMD (~2–4× faster WASM fallback). Every other page ships with plain headers, so Google AdSense scripts keep full cookie access and normal ad serving there. Under COEP the ad scripts still load but are cookie-stripped (result: "limited ads" on those two tool pages — accepted tradeoff).
+- `Cache-Control: immutable` for `/models/*` so the ~67MB ONNX files are fetched once per client.
 
-1. In your repository, go to **Settings > Pages**.
-2. Set **Build and deployment** to **GitHub Actions**.
-3. Push to `main` to build and publish automatically.
+Deploy by connecting the repository in the Vercel dashboard (framework preset: Next.js). No other settings required.
 
-The app uses a relative Vite base path, so it works when hosted as a project page like `https://<user>.github.io/<repo>/`.
-
-For a local publish flow, run `npm run deploy` to build and push `dist/` to the `gh-pages` branch, then set Pages to serve from that branch if you prefer manual deployment.
+Static export output also ends up in `out/` if you ever want to self-host (`output: 'export'` in `next.config.mjs`).
 
 ## Browser Compatibility
 

@@ -1,5 +1,9 @@
 node_modules/
 .temp_frames/
 dist/
+out/
+.next/
 
-.gitignore
+.gitignoreout/
+.next/
+*.tsbuildinfo

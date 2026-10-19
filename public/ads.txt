@@ -1,0 +1,6 @@
+# ads.txt — required for Google AdSense payment verification.
+# Replace XXXXXXXXXXXXXXXX with your AdSense publisher ID (the number after
+# "pub-" in your ca-pub-XXXXXXXXXXXXXXXX account ID) and uncomment the line.
+# Publish at the site root: https://pixelify.me/ads.txt
+#
+# google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0
