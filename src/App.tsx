@@ -60,6 +60,7 @@ import ProductsPage from './components/pages/ProductsPage';
 import PrivacyPage from './components/pages/PrivacyPage';
 import TermsPage from './components/pages/TermsPage';
 import DeviceRecommendationNotice from './components/DeviceRecommendationNotice';
+import ScrollToTopButton from './components/ScrollToTopButton';
 
 const STORAGE_KEY = 'pixelify_upscaler_history_2026'; // legacy, no longer written
 const THEME_KEY = 'pixelify_theme_pref';
@@ -954,6 +955,10 @@ export default function App() {
 
         </Routes>
       </main>
+
+      {(activeTab === 'home' || activeTab === 'bg_remove' || activeTab === 'upscaler') && (
+        <ScrollToTopButton />
+      )}
     </div>
   );
 }

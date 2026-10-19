@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Crop as CropIcon } from 'lucide-react';
-import Icon from './Icon';
 import FabricImageEditor, {
   FabricEditMode,
   FabricCropRatio,
@@ -812,18 +811,18 @@ export default function BGComparator({
             <div className="relative z-10 max-w-sm">
               <h4 className="text-xl font-black text-white mb-1 tracking-tight">Extracting Subject...</h4>
               <p className="text-xs text-neutral-400 font-mono">
-                {job.message || 'Chopper neural network segmenting edges...'}
+                {job.message || 'Neural network segmenting edges...'}
               </p>
             </div>
 
             <div className="relative z-10 w-full max-w-xs h-2 rounded-full bg-white/10 overflow-hidden border border-white/10">
               <div
-                className="h-full bg-gradient-to-r from-blue-500 via-cyan-400 to-[#00FF85] transition-all duration-300 shadow-[0_0_12px_#00FF85]"
-                style={{ width: `${job.progress || 15}%` }}
+                className="h-full bg-gradient-to-r from-blue-500 via-cyan-400 to-[#00FF85] transition-all duration-300 ease-out shadow-[0_0_12px_#00FF85]"
+                style={{ width: `${Math.min(100, Math.max(5, typeof job.progress === 'number' ? job.progress : 15))}%` }}
               />
             </div>
             <span className="relative z-10 text-[11px] font-mono text-[#00FF85] font-bold">
-              {job.progress || 15}% Complete
+              {Math.min(100, Math.max(0, typeof job.progress === 'number' ? job.progress : 15))}% Complete
             </span>
           </div>
         ) : (
@@ -1029,13 +1028,29 @@ export default function BGComparator({
                   />
                 </div>
 
+                {/* SLIDER LINE & HANDLE (MATCHING UPSCALE COMPARISON SLIDER IN WHITE) */}
                 <div
-                  className="absolute top-0 bottom-0 w-0.5 bg-[#00FF85] shadow-[0_0_15px_#00FF85] pointer-events-none z-20 flex items-center justify-center"
+                  className="pointer-events-none absolute inset-y-0 z-20 w-[2px] -translate-x-1/2 bg-white shadow-[0_0_10px_rgba(0,0,0,.5)]"
                   style={{ left: `${split}%` }}
                 >
-                  <div className="w-9 h-9 rounded-full bg-slate-900 text-[#00FF85] border-2 border-[#00FF85] shadow-2xl flex items-center justify-center text-xs font-bold">
-                    <Icon name="arrows" size={16} />
+                  <div className="absolute left-1/2 top-1/2 flex h-[48px] w-[48px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[14px] bg-white shadow-[0_8px_30px_rgba(0,0,0,.4)] pointer-events-none">
+                    <div className="flex items-center gap-[5px] text-black">
+                      <svg width="7" height="12" viewBox="0 0 7 12" fill="none">
+                        <path d="M6 1L1 6L6 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <svg width="7" height="12" viewBox="0 0 7 12" fill="none">
+                        <path d="M1 1L6 6L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
                   </div>
+                </div>
+
+                {/* CORNER LABELS */}
+                <div className="pointer-events-none absolute left-3 top-3 z-30 rounded-md bg-black/60 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white backdrop-blur-sm">
+                  Original
+                </div>
+                <div className="pointer-events-none absolute right-3 top-3 z-30 rounded-md bg-black/60 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white backdrop-blur-sm">
+                  Cutout
                 </div>
 
                 <input

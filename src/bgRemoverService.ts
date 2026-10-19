@@ -23,13 +23,15 @@ export interface BGRemoverState {
 }
 
 export type EngineSubscriber = (engine: BGEngine, webgpuAvailable: boolean) => void;
-export type ProgressSubscriber = (pct: number) => void;
+export type ProgressSubscriber = (pct: number, isWeights?: boolean, file?: string) => void;
+export type StageSubscriber = (stage: string, message?: string) => void;
 
 interface JobResolver {
   url: string;
   resolve: (res: { blob: Blob; elapsedMs: number }) => void;
   reject: (err: Error) => void;
   onProgress?: ProgressSubscriber;
+  onStage?: StageSubscriber;
 }
 
 class BGRemoverService {
@@ -100,8 +102,16 @@ class BGRemoverService {
           this.state.phase = 'downloading';
           this.notifyStateSubscribers();
           this.jobResolvers.forEach((resolver) => {
-            resolver.onProgress?.(msg.progress);
+            resolver.onProgress?.(msg.progress, msg.isWeights, msg.file);
           });
+          return;
+        }
+
+        if (msg.type === 'JOB_STAGE') {
+          const entry = this.jobResolvers.get(msg.id);
+          if (entry) {
+            entry.onStage?.(msg.stage, msg.message);
+          }
           return;
         }
 
@@ -289,11 +299,12 @@ class BGRemoverService {
   public removeBackground(
     id: string,
     url: string,
-    onProgress?: ProgressSubscriber
+    onProgress?: ProgressSubscriber,
+    onStage?: StageSubscriber
   ): Promise<{ blob: Blob; elapsedMs: number }> {
     const worker = this.getWorker();
     return new Promise((resolve, reject) => {
-      this.jobResolvers.set(id, { url, resolve, reject, onProgress });
+      this.jobResolvers.set(id, { url, resolve, reject, onProgress, onStage });
       worker.postMessage({ type: 'REMOVE_BG', id, url });
     });
   }

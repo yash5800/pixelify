@@ -125,6 +125,9 @@ function progressCallback(event: any) {
   if (event?.status === 'progress') {
     const total = Number(event.total || 0);
     const loaded = Number(event.loaded || 0);
+    const file = String(event.file || '');
+    // Transformers.js downloads several config files (<1MB) and the actual model weights (>5MB or .onnx)
+    const isWeights = file.endsWith('.onnx') || total > 5 * 1024 * 1024;
     const progress = total > 0 ? Math.max(0, Math.min(100, Math.round((loaded / total) * 100))) : null;
     post({
       type: 'PROGRESS',
@@ -133,6 +136,7 @@ function progressCallback(event: any) {
       file: event.file,
       loaded,
       total: total || null,
+      isWeights,
     });
   } else if (event?.status) {
     post({ type: 'STATUS', stage: String(event.status), detail: event.file });
@@ -387,10 +391,13 @@ async function handleMessage(data: WorkerMessage): Promise<void> {
   if (type === 'REMOVE_BG') {
     const startedAt = performance.now();
     try {
+      post({ type: 'JOB_STAGE', id, stage: 'reading-image', message: 'Analyzing image data...' });
       postStatus('reading-image', { id });
       const inputBlob = await loadInputBlob(url || '');
+      post({ type: 'JOB_STAGE', id, stage: 'running-inference', message: 'Neural network segmenting subject...' });
       postStatus('running-inference', { id, engine: chosenEngine });
       const output = await runInference(inputBlob);
+      post({ type: 'JOB_STAGE', id, stage: 'encoding-output', message: 'Refining transparent cutout edges...' });
       postStatus('encoding-output', { id });
       if (!output || typeof output.toBlob !== 'function') {
         throw new Error('The background-removal model returned an unsupported output.');

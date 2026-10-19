@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Menu, Trash2 } from 'lucide-react';
 import type { ViewTab, ThemeMode } from '../types';
 import Icon from './Icon';
@@ -255,7 +256,13 @@ export default function Navbar({
                     <Trash2 size={14} />
                     {isClearingModelCache ? 'Clearing models…' : 'Clear downloaded models'}
                   </button>
-                  <p className="mt-1.5 px-1 text-[9px] leading-relaxed text-neutral-600">Stored locally; the browser may still evict site data.</p>
+                  <Link
+                    to="/blogs/enable_webgpu_guide_b5c9e8"
+                    onClick={() => setIsSettingsOpen(false)}
+                    className="mt-1.5 block px-1 text-[10px] font-medium text-[#00FF85] hover:text-[#00FF85]/80 hover:underline transition-colors leading-relaxed"
+                  >
+                    Learn how to enable webGPU on your browser!
+                  </Link>
                 </div>
             )}
           </div>

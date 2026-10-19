@@ -21,12 +21,12 @@ const TOOL_CONTENT: Record<
   bg_remove: {
     title: 'A smoother experience on desktop',
     description:
-      'Pixelify works on mobile, too! For potentially faster AI background removal, we recommend using a desktop or laptop.',
+      'Pixelify works on mobile, too! For potentially faster AI Image Background Removal, we recommend using a desktop or laptop.',
   },
   upscale: {
     title: 'A smoother experience on desktop',
     description:
-      'Pixelify works on mobile, too! For potentially faster AI upscaling, we recommend using a desktop or laptop.',
+      'Pixelify works on mobile, too! For potentially faster AI Image Upscaling, we recommend using a desktop or laptop.',
   },
 };
 

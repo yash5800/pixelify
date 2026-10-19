@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { X, Home, Eraser, Sparkles, ChevronRight, Trash2 } from 'lucide-react';
 import type { ViewTab } from '../types';
 import Logo from './Logo';
@@ -116,11 +117,10 @@ export default function MobileSidebar({
                 key={tab}
                 type="button"
                 onClick={() => go(tab)}
-                className={`group flex w-full cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2.5 text-[15px] transition-colors ${
-                  isActive
+                className={`group flex w-full cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2.5 text-[15px] transition-colors ${isActive
                     ? 'bg-white/[0.08] font-semibold text-white'
                     : 'font-medium text-neutral-300 hover:bg-white/[0.04] hover:text-white'
-                }`}
+                  }`}
               >
                 <Icon
                   size={18}
@@ -149,19 +149,18 @@ export default function MobileSidebar({
               <div className="flex items-center justify-between text-[11px]">
                 <span className="font-semibold text-neutral-400">WebGPU availability</span>
                 <span
-                  className={`font-mono text-[9.5px] font-bold ${
-                    webgpuAvailable === null
+                  className={`font-mono text-[9.5px] font-bold ${webgpuAvailable === null
                       ? 'text-neutral-500'
                       : webgpuAvailable
-                      ? 'text-[#00FF85]'
-                      : 'text-sky-300'
-                  }`}
+                        ? 'text-[#00FF85]'
+                        : 'text-sky-300'
+                    }`}
                 >
                   {webgpuAvailable === null
                     ? 'CHECKING…'
                     : webgpuAvailable
-                    ? 'Fast'
-                    : 'Standard'}
+                      ? 'Fast'
+                      : 'Standard'}
                 </span>
               </div>
             )}
@@ -185,9 +184,13 @@ export default function MobileSidebar({
                 <Trash2 size={14} className={isClearingModelCache ? 'animate-pulse' : ''} />
                 {isClearingModelCache ? 'Clearing models…' : 'Clear downloaded models'}
               </button>
-              <p className="mt-1.5 px-0.5 text-[9px] leading-relaxed text-neutral-600">
-                Stored locally; the browser may still evict site data.
-              </p>
+              <Link
+                to="/blogs/enable_webgpu_guide_b5c9e8"
+                onClick={onClose}
+                className="mt-1.5 block px-0.5 text-[10px] font-medium text-[#00FF85] hover:text-[#00FF85]/80 hover:underline transition-colors leading-relaxed"
+              >
+                Learn how to enable webGPU on your browser!
+              </Link>
             </div>
           )}
         </div>

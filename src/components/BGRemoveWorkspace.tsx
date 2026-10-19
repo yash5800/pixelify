@@ -17,6 +17,7 @@ import {
   ELEMENT_PRESETS,
   renderDesignLayersToCanvas,
 } from './bgremove/DesignAssets';
+import DeviceRecommendationNotice from './DeviceRecommendationNotice';
 
 interface BGRemoveWorkspaceProps {
   jobs: BGJob[];
@@ -163,6 +164,23 @@ export default function BGRemoveWorkspace({
   const [textLayers, setTextLayers] = useState<TextLayer[]>([]);
   const [elementLayers, setElementLayers] = useState<ElementLayer[]>([]);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
+  const strokeColorInputRef = useRef<HTMLInputElement>(null);
+
+  const handleOpenStrokeColorPicker = (e?: React.MouseEvent) => {
+    if (strokeColorInputRef.current) {
+      if (typeof strokeColorInputRef.current.showPicker === 'function') {
+        try {
+          strokeColorInputRef.current.showPicker();
+          e?.preventDefault();
+          return;
+        } catch {
+          // Native click fallback
+        }
+      }
+      strokeColorInputRef.current.click();
+    }
+  };
+
 
   // Subscribe to the app-wide worker; App starts its preload on the first visit.
   useEffect(() => {
@@ -228,18 +246,103 @@ export default function BGRemoveWorkspace({
   };
 
   async function processJob(job: BGJob) {
-    updateJob(job.id, { status: 'loading', progress: 5, message: 'Loading AI vision model...' });
+    const serviceState = bgRemoverService.getState();
+    const isModelReady = serviceState.isReady;
+
+    let currentProgress = isModelReady ? 15 : 5;
+    let currentMessage = isModelReady
+      ? 'Analyzing image pixels...'
+      : 'Loading AI vision model weights...';
+
+    updateJob(job.id, {
+      status: isModelReady ? 'processing' : 'loading',
+      progress: currentProgress,
+      message: currentMessage,
+    });
+
+    let tickerInterval: ReturnType<typeof setInterval> | null = null;
+    const startTicker = (startPct: number, targetPct = 92) => {
+      if (tickerInterval) clearInterval(tickerInterval);
+      currentProgress = Math.max(currentProgress, startPct);
+      tickerInterval = setInterval(() => {
+        if (currentProgress < targetPct) {
+          const remaining = targetPct - currentProgress;
+          const step = Math.max(1, Math.round(remaining * 0.12));
+          currentProgress = Math.min(targetPct, currentProgress + step);
+
+          let stageMsg = currentMessage;
+          if (currentProgress >= 25 && currentProgress < 50) {
+            stageMsg = 'Detecting subject contours & lighting...';
+          } else if (currentProgress >= 50 && currentProgress < 78) {
+            stageMsg = 'Extracting clean subject cutout...';
+          } else if (currentProgress >= 78) {
+            stageMsg = 'Refining transparent edge detail...';
+          }
+          currentMessage = stageMsg;
+
+          updateJob(job.id, {
+            status: 'processing',
+            progress: currentProgress,
+            message: currentMessage,
+          });
+        }
+      }, 110);
+    };
+
+    if (isModelReady) {
+      startTicker(15, 92);
+    }
+
     try {
       const { blob, elapsedMs } = await bgRemoverService.removeBackground(
         job.id,
         job.sourceUrl,
-        (pct) => updateJob(job.id, {
-          progress: Math.min(80, Math.max(5, Math.round(pct * 0.8))),
-          message: 'Preparing neural network...',
-        })
+        (pct, isWeights) => {
+          if (isWeights || pct > 0) {
+            const mapped = Math.min(60, Math.max(5, Math.round(5 + pct * 0.55)));
+            currentProgress = Math.max(currentProgress, mapped);
+            currentMessage = `Downloading AI vision model (${pct}%)...`;
+            updateJob(job.id, {
+              status: 'loading',
+              progress: currentProgress,
+              message: currentMessage,
+            });
+            if (pct >= 100) {
+              startTicker(65, 92);
+            }
+          }
+        },
+        (stage, msg) => {
+          if (stage === 'running-inference') {
+            startTicker(Math.max(currentProgress, 40), 92);
+          } else if (stage === 'encoding-output') {
+            if (tickerInterval) clearInterval(tickerInterval);
+            currentProgress = Math.max(currentProgress, 94);
+            currentMessage = msg || 'Encoding transparent PNG...';
+            updateJob(job.id, {
+              status: 'processing',
+              progress: currentProgress,
+              message: currentMessage,
+            });
+          }
+        }
       );
 
-      updateJob(job.id, { status: 'processing', progress: 88, message: 'Extracting clean subject cutout...' });
+      if (tickerInterval) clearInterval(tickerInterval);
+
+      updateJob(job.id, {
+        status: 'processing',
+        progress: 98,
+        message: 'Finalizing cutout...',
+      });
+      await new Promise((r) => setTimeout(r, 140));
+
+      updateJob(job.id, {
+        status: 'processing',
+        progress: 100,
+        message: 'Cutout complete!',
+      });
+      await new Promise((r) => setTimeout(r, 220));
 
       const url = URL.createObjectURL(blob);
 
@@ -254,6 +357,7 @@ export default function BGRemoveWorkspace({
 
       addToast('success', `${job.name} background removed!`);
     } catch (err: any) {
+      if (tickerInterval) clearInterval(tickerInterval);
       console.error('processJob failed:', err);
       const rawMessage = String(err?.message || '');
       const userMessage = /webgpu|onnxruntime|ortRun|buffer|adapter|device lost/i.test(rawMessage)
@@ -730,7 +834,7 @@ export default function BGRemoveWorkspace({
                 type="button"
                 onClick={() => setIsCompareMode((prev) => !prev)}
                 className={`p-2 rounded-full transition cursor-pointer flex items-center justify-center ${isCompareMode
-                  ? 'bg-blue-600 text-white shadow-md'
+                  ? 'bg-white text-slate-900 shadow-md ring-2 ring-white/30'
                   : 'text-slate-600 dark:text-neutral-300 hover:bg-slate-100 dark:hover:bg-white/10'
                   }`}
                 title="Toggle Before/After Compare"
@@ -1472,46 +1576,72 @@ export default function BGRemoveWorkspace({
                                 </div>
                               </div>
 
-                              {/* Stroke Color: RGB popup matching background color section */}
-                              <div className="flex items-center justify-between pt-1">
+                              {/* Stroke Color */}
+                              <div className="relative flex items-center justify-between pt-1">
+                                {/* Invisible native input positioned at left: 0 so the browser anchors the color picker dialog to the left side and prevents it from cutting off on the screen edge */}
+                                <input
+                                  ref={strokeColorInputRef}
+                                  id="effect-stroke-color"
+                                  type="color"
+                                  value={effects.strokeColor || '#00FF85'}
+                                  onChange={(event) => {
+                                    recordEditorEdit();
+                                    setEffects((prev) => ({ ...prev, strokeColor: event.target.value }));
+                                  }}
+                                  style={{
+                                    position: 'absolute',
+                                    left: '0px',
+                                    top: '0px',
+                                    width: '32px',
+                                    height: '32px',
+                                    opacity: 0,
+                                    pointerEvents: 'none',
+                                    zIndex: 0,
+                                  }}
+                                  aria-label="Open custom stroke color picker"
+                                  tabIndex={-1}
+                                />
+
+                                <label
+                                  htmlFor="effect-stroke-color"
+                                  onClick={handleOpenStrokeColorPicker}
+                                  className="font-bold text-xs text-slate-800 dark:text-white cursor-pointer select-none"
+                                >
+                                  Stroke Color
+                                </label>
                                 <div className="flex items-center gap-2">
-                                  <span
-                                    className="h-3 w-3 rounded-full border border-black/10 shadow-sm transition-colors"
-                                    style={{ backgroundColor: effects.strokeColor || '#00FF85' }}
-                                  />
-                                  <label htmlFor="effect-stroke-color" className="font-bold text-xs text-slate-800 dark:text-white cursor-pointer">
-                                    Stroke Color
-                                  </label>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="rounded-lg bg-white px-2 py-0.5 font-mono text-[11px] font-bold text-slate-800 shadow-sm dark:bg-white/10 dark:text-white uppercase">
+                                  <label
+                                    htmlFor="effect-stroke-color"
+                                    onClick={handleOpenStrokeColorPicker}
+                                    className="rounded-lg bg-white px-2 py-0.5 font-mono text-[11px] font-bold text-slate-800 shadow-sm dark:bg-white/10 dark:text-white uppercase cursor-pointer hover:bg-slate-100 dark:hover:bg-white/20 transition"
+                                    title="Click to pick custom stroke color"
+                                  >
                                     {effects.strokeColor || '#00FF85'}
-                                  </span>
-                                  {/* Exact RGB popup tile matching background color section */}
-                                  <div className="relative">
-                                    <div
-                                      className="relative h-8 w-8 overflow-hidden rounded-xl border-2 shadow-sm transition-all hover:scale-105 cursor-pointer ring-2 ring-black/5 dark:ring-white/10"
-                                      style={{ borderColor: effects.strokeColor || '#00FF85' }}
-                                    >
-                                      <span
-                                        className="absolute inset-0 rounded-[10px]"
-                                        style={{ background: 'linear-gradient(135deg, #f72585 0%, #7b2ff7 22%, #247bff 44%, #00c9a7 66%, #ffb703 84%, #f72585 100%)' }}
-                                      />
-                                      <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-lg font-medium text-white drop-shadow">+</span>
-                                      <input
-                                        id="effect-stroke-color"
-                                        type="color"
-                                        value={effects.strokeColor || '#00FF85'}
-                                        onChange={(event) => {
-                                          recordEditorEdit();
-                                          setEffects((prev) => ({ ...prev, strokeColor: event.target.value }));
-                                        }}
-                                        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                                        aria-label="Open custom stroke color picker"
-                                        title="Custom RGB stroke color"
-                                      />
-                                    </div>
-                                  </div>
+                                  </label>
+
+                                  {/* Custom RGB Spectrum Color Tile Picker with + button (matching background solids picker) */}
+                                  <label
+                                    htmlFor="effect-stroke-color"
+                                    onClick={handleOpenStrokeColorPicker}
+                                    className={`relative h-8 w-8 overflow-hidden rounded-xl border-2 transition hover:scale-105 cursor-pointer block ${
+                                      effects.strokeColor
+                                        ? 'border-[#00FF85] ring-2 ring-[#00FF85]/20'
+                                        : 'border-slate-300 dark:border-white/15'
+                                    }`}
+                                    title="Open stroke color picker"
+                                    aria-label="Open custom stroke color picker"
+                                  >
+                                    <span
+                                      className="absolute inset-0 rounded-[10px]"
+                                      style={{
+                                        background:
+                                          'linear-gradient(135deg, #f72585 0%, #7b2ff7 22%, #247bff 44%, #00c9a7 66%, #ffb703 84%, #f72585 100%)',
+                                      }}
+                                    />
+                                    <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-lg font-medium text-white drop-shadow">
+                                      +
+                                    </span>
+                                  </label>
                                 </div>
                               </div>
                             </div>
@@ -2363,6 +2493,9 @@ export default function BGRemoveWorkspace({
       ) : (
         /* EMPTY STATE: USER HAS NOT UPLOADED AN IMAGE YET */
         <div className="flex flex-col gap-6 w-full">
+
+          <DeviceRecommendationNotice tool="bg_remove" />
+
           <UploadArea
             onFile={handleUpload}
             isLoading={false}
