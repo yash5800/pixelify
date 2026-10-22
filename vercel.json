@@ -9,16 +9,12 @@
     "api/bg-remove.js": {
       "memory": 2048,
       "maxDuration": 300,
-      "includeFiles": [
-        "node_modules/onnxruntime-node/bin/napi-v3/linux/x64/**"
-      ]
+      "includeFiles": "node_modules/onnxruntime-node/bin/napi-v3/linux/x64/**"
     },
     "api/health.js": {
       "memory": 2048,
       "maxDuration": 300,
-      "includeFiles": [
-        "node_modules/onnxruntime-node/bin/napi-v3/linux/x64/**"
-      ]
+      "includeFiles": "node_modules/onnxruntime-node/bin/napi-v3/linux/x64/**"
     }
   },
   "headers": [
