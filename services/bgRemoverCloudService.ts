@@ -61,6 +61,13 @@ export interface CloudEngineStatus {
 export interface CloudRemoveResult {
   blob: Blob;
   elapsedMs: number;
+  /**
+   * The cloud engine always runs on the server's CPU — the native runtime
+   * ships no CUDA payload and the session pins the CPU execution provider
+   * (see server/chopperModel.mjs). It is spelled out here so the caller can
+   * report the provenance of the output like the on-device path does.
+   */
+  engine: 'cloud-cpu';
 }
 
 const HEALTH_TIMEOUT_MS = 4000;
@@ -176,7 +183,7 @@ class BGRemoverCloudService {
     onStage?.('encoding-output', 'Compositing transparent cutout...');
     const blob = await compositeChopperMask(image, mask);
 
-    return { blob, elapsedMs: Date.now() - startedAt };
+    return { blob, elapsedMs: Date.now() - startedAt, engine: 'cloud-cpu' };
   }
 }
 

@@ -129,6 +129,15 @@ export interface BackgroundPrompt {
   tags: string[];
 }
 
+/**
+ * Where a cutout was actually computed.
+ *
+ *  - 'device-webgpu' — the browser's GPU, via the WebGPU execution provider.
+ *  - 'device-wasm'   — the visitor's own CPU, via the WebAssembly provider.
+ *  - 'cloud-cpu'     — our server's CPU (the cloud engine). Never a GPU.
+ */
+export type BGJobEngine = 'device-webgpu' | 'device-wasm' | 'cloud-cpu';
+
 export interface BGJob {
   id: string;
   file: File;
@@ -140,6 +149,8 @@ export interface BGJob {
   progress: number;
   message: string;
   elapsedMs?: number;
+  /** Which engine produced this cutout — set once the job completes. */
+  engine?: BGJobEngine;
 }
 
 export interface ToastMessage {

@@ -222,7 +222,14 @@ export async function getSession() {
         interOpNumThreads: 1,
         enableCpuMemArena: ARENA,
         enableMemPattern: false,
+        // Pinned: this function must never pick up an accelerator EP. The
+        // native build only bundles the CPU provider (CUDA/TensorRT are
+        // `bundled: false`), so asking for 'cuda' would hard-fail the whole
+        // session instead of falling back.
+        executionProviders: ['cpu'],
       });
+      // `bundled: true` means the provider is actually present in this build.
+      const backends = ort.listSupportedBackends ? ort.listSupportedBackends() : [];
       sessionInfo = {
         ...(sessionInfo || {}),
         sessionCreateMs: Date.now() - startedAt,
@@ -231,6 +238,10 @@ export async function getSession() {
         threads: THREADS,
         arena: ARENA,
         ortVersion: ort.env?.versions?.common || null,
+        executionProviders: ['cpu'],
+        availableBackends: backends.map((b) => b.name),
+        bundledBackends: backends.filter((b) => b.bundled).map((b) => b.name),
+        gpuAvailable: backends.some((b) => b.bundled && b.name !== 'cpu'),
       };
       state = 'ready';
       lastError = null;
@@ -361,6 +372,10 @@ export function getStatus() {
     // `ready` is only true once the session actually exists — the weights
     // may still be downloading.
     ready: state === 'ready',
+    // The cloud engine never uses a GPU: the native build bundles the CPU
+    // provider only, and the session pins it explicitly.
+    executionProviders: ['cpu'],
+    gpuAvailable: false,
     ...(lastError ? { lastError } : {}),
     ...(sessionInfo || {}),
     rssMb: Math.round(memory.rss / 1048576),

@@ -28,7 +28,7 @@ export type StageSubscriber = (stage: string, message?: string) => void;
 
 interface JobResolver {
   url: string;
-  resolve: (res: { blob: Blob; elapsedMs: number }) => void;
+  resolve: (res: { blob: Blob; elapsedMs: number; engine: BGEngine }) => void;
   reject: (err: Error) => void;
   onProgress?: ProgressSubscriber;
   onStage?: StageSubscriber;
@@ -172,7 +172,14 @@ class BGRemoverService {
           const entry = this.jobResolvers.get(msg.id);
           if (entry) {
             this.jobResolvers.delete(msg.id);
-            entry.resolve({ blob: msg.blob, elapsedMs: msg.elapsedMs });
+            // The worker reports the backend it actually ran on — it can be
+            // 'wasm' even when WebGPU was preferred (fallback to the CPU).
+            // The caller uses this to tell the user where the cutout ran.
+            entry.resolve({
+              blob: msg.blob,
+              elapsedMs: msg.elapsedMs,
+              engine: msg.engine === 'webgpu' ? 'webgpu' : 'wasm',
+            });
           }
           return;
         }
@@ -301,7 +308,7 @@ class BGRemoverService {
     url: string,
     onProgress?: ProgressSubscriber,
     onStage?: StageSubscriber
-  ): Promise<{ blob: Blob; elapsedMs: number }> {
+  ): Promise<{ blob: Blob; elapsedMs: number; engine: BGEngine }> {
     const worker = this.getWorker();
     return new Promise((resolve, reject) => {
       this.jobResolvers.set(id, { url, resolve, reject, onProgress, onStage });

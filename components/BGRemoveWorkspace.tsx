@@ -1,15 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Scissors, Image as ImageIcon, Sparkles, SlidersHorizontal, PanelsTopLeft, Columns2, Undo2, Redo2, Download as DownloadIcon, ChevronDown, ZoomIn, ZoomOut, RotateCcw, RotateCw, Crop as CropIcon, Plus, FlipHorizontal, FlipVertical, Check, X, Cpu, Cloud } from 'lucide-react';
+import { Scissors, Image as ImageIcon, Sparkles, SlidersHorizontal, PanelsTopLeft, Columns2, Undo2, Redo2, Download as DownloadIcon, ChevronDown, ZoomIn, ZoomOut, RotateCcw, RotateCw, Crop as CropIcon, Plus, FlipHorizontal, FlipVertical, Check, X, Cpu, Gpu, Cloud } from 'lucide-react';
 import UploadArea from './UploadArea';
 import BGComparator, { ImageAdjustments, ImageEffects } from './BGComparator';
 import type { FabricEditMode, FabricCropRatio, FabricImageEditorHandle, SubjectTransform } from './bgremove/FabricImageEditor';
 import { DEFAULT_SUBJECT_TRANSFORM } from './bgremove/FabricImageEditor';
 import { makeId, downloadName } from '../lib/bgUtils';
+import { describeEngine, deviceEngineSource } from '../lib/bgEngine';
 import { bgRemoverService } from '../services/bgRemoverService';
 import { bgRemoverCloudService } from '../services/bgRemoverCloudService';
 import type { CloudEngineStatus } from '../services/bgRemoverCloudService';
-import type { BGJob } from '../types';
+import type { BGJob, BGJobEngine } from '../types';
 import {
   TextLayer,
   ElementLayer,
@@ -448,16 +449,32 @@ export default function BGRemoveWorkspace({
         }
       };
 
-      const { blob, elapsedMs } = useCloud
-        ? await bgRemoverCloudService.removeBackground(job.sourceUrl, (stage, msg) =>
-            onStage(stage, msg)
-          )
-        : await bgRemoverService.removeBackground(
-            job.id,
-            job.sourceUrl,
-            onProgress,
-            onStage
-          );
+      // The two engines report different discriminators, so the result is
+      // unpacked per branch instead of through a union.
+      let blob: Blob;
+      let elapsedMs: number;
+      let jobEngine: BGJobEngine;
+
+      if (useCloud) {
+        const result = await bgRemoverCloudService.removeBackground(job.sourceUrl, (stage, msg) =>
+          onStage(stage, msg)
+        );
+        blob = result.blob;
+        elapsedMs = result.elapsedMs;
+        jobEngine = result.engine;
+      } else {
+        const result = await bgRemoverService.removeBackground(
+          job.id,
+          job.sourceUrl,
+          onProgress,
+          onStage
+        );
+        blob = result.blob;
+        elapsedMs = result.elapsedMs;
+        // The worker reports the backend it actually ran on — it can be
+        // 'wasm' even when WebGPU was preferred (fallback to the CPU).
+        jobEngine = deviceEngineSource(result.engine);
+      }
 
       // A successful cloud cutout means the model is loaded on the server.
       // The panel was probed before that, so re-read the status — otherwise it
@@ -490,16 +507,21 @@ export default function BGRemoveWorkspace({
 
       const url = URL.createObjectURL(blob);
 
+      // Where the cutout was actually computed: the visitor's GPU (WebGPU),
+      // the visitor's own CPU (WebAssembly), or our server's CPU.
+      const engineInfo = describeEngine(jobEngine, { cloudRunsLocally });
+
       updateJob(job.id, {
         status: 'done',
         progress: 100,
-        message: 'Complete',
+        message: `Complete · ${engineInfo.short}`,
         resultUrl: url,
         resultBlob: blob,
         elapsedMs,
+        engine: jobEngine,
       });
 
-      addToast('success', `${job.name} background removed!`);
+      addToast('success', `${job.name} background removed — ${engineInfo.label}.`);
     } catch (err: any) {
       if (tickerInterval) clearInterval(tickerInterval);
       if (isStale()) return;
@@ -1168,6 +1190,9 @@ export default function BGRemoveWorkspace({
                   </button>
                   {jobs.map((job) => {
                     const isSelected = selected?.id === job.id;
+                    const jobEngine = job.engine
+                      ? describeEngine(job.engine, { cloudRunsLocally })
+                      : null;
                     return (
                       <div
                         key={job.id}
@@ -1189,6 +1214,23 @@ export default function BGRemoveWorkspace({
                             className="h-full w-full rounded-2xl object-cover bg-[#13141b]"
                           />
                         </button>
+
+                        {/* WHERE THIS CUTOUT WAS COMPUTED — GPU / CPU / CLOUD CPU */}
+                        {jobEngine && (
+                          <span
+                            className={`pointer-events-none absolute bottom-1 left-1 z-10 inline-flex items-center gap-0.5 rounded-md border px-1 py-0.5 font-mono text-[7px] font-bold leading-none backdrop-blur-md ${jobEngine.pill}`}
+                            title={jobEngine.detail}
+                          >
+                            {jobEngine.icon === 'gpu' ? (
+                              <Gpu className="h-2 w-2" aria-hidden="true" />
+                            ) : jobEngine.icon === 'cloud' ? (
+                              <Cloud className="h-2 w-2" aria-hidden="true" />
+                            ) : (
+                              <Cpu className="h-2 w-2" aria-hidden="true" />
+                            )}
+                            {jobEngine.short}
+                          </span>
+                        )}
 
                         <button
                           type="button"
