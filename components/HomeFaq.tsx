@@ -9,7 +9,7 @@ interface FaqItem {
 const FAQ_ITEMS: FaqItem[] = [
   {
     q: 'How does Pixelify process images without uploading to cloud servers?',
-    a: 'Pixelify executes AI neural networks (Chopper for background removal, Vitality, Pixel-Dance & Alpha-Satoru for upscaling) directly in your browser using ONNX Runtime Web and WebGPU. Model weights are downloaded to your browser cache on first use, after which all tensor math runs locally on your device with 0 bytes uploaded to external servers.',
+    a: 'Pixelify executes AI neural networks (Chopper for background removal, Vitality, Pixel-Dance & Alpha-Satoru for upscaling) directly in your browser using ONNX Runtime Web and WebGPU. Model weights are downloaded to your browser cache on first use, after which all tensor math runs locally on your device with 0 bytes uploaded to external servers. The Background Remover also offers an optional "Cloud (CPU)" engine for devices that cannot run the model locally: it sends a single 512×512 thumbnail (786 KB) to our own server, gets a mask back, and composites it over your original photo in the browser — your full-resolution image still never leaves the device.',
   },
   {
     q: 'Is Pixelify really 100% free with no watermarks or subscriptions?',
@@ -33,7 +33,7 @@ const FAQ_ITEMS: FaqItem[] = [
   },
   {
     q: 'Are my private photos and client confidential assets safe?',
-    a: '100% safe. You can inspect your browser’s Developer Tools Network tab during processing: no image payloads, no thumbnail previews, and no tracking telemetry ever leave your device. It is completely safe for enterprise client NDAs and confidential photography.',
+    a: '100% safe. You can inspect your browser’s Developer Tools Network tab during processing: no image payloads, no thumbnail previews, and no tracking telemetry ever leave your device. It is completely safe for enterprise client NDAs and confidential photography. The one exception is the optional Cloud (CPU) engine, which you have to select yourself and which only ever transmits a 512×512 thumbnail of the image you are editing.',
   },
   {
     q: 'How do I clear downloaded models if I need to free up browser storage?',

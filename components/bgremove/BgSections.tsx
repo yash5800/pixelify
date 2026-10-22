@@ -119,7 +119,8 @@ export const BgPipeline: React.FC = () => {
             <em>Absolute privacy.</em>
           </h2>
           <p className="bgr-lede pb-reveal" style={{ '--rv-i': '0.12s' } as React.CSSProperties}>
-            From drag-and-drop to finished cutout without a single byte leaving the machine.
+            From drag-and-drop to finished cutout without a single byte leaving the machine — or, if
+            your device needs a hand, a single 512×512 thumbnail to our CPU and nothing more.
           </p>
           <div className="bgr-cross-wrap pb-reveal" style={{ '--rv-i': '0.18s' } as React.CSSProperties} aria-hidden="true">
             <Crosshair />
@@ -357,7 +358,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Are my images uploaded to a server?',
-    a: 'No. The Chopper segmentation model runs directly inside your browser through Transformers.js with WebGPU or WebAssembly. Your photos never leave your device, which makes it safe for private or client work.',
+    a: 'Not by default. The Chopper segmentation model runs directly inside your browser through Transformers.js with WebGPU or WebAssembly, so your photos never leave your device — safe for private or client work. If your device cannot run the model, you can switch the Processing Engine to "Cloud (CPU)": that sends a single 512×512 thumbnail (786 KB) to our server and composites the returned mask over your original photo locally, so the full-resolution image still never leaves the device.',
   },
   {
     q: 'Which formats can I use and export?',
@@ -373,7 +374,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Why is the first image slower?',
-    a: 'The roughly 40 MB model downloads to your browser cache on first use. Every image after that reuses it, so processing drops to a couple of seconds on most hardware.',
+    a: 'The roughly 183 MB model downloads to your browser cache on first use. Every image after that reuses it, so processing drops to a couple of seconds on most hardware.',
   },
 ];
 

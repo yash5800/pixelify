@@ -3,7 +3,15 @@ node_modules/
 dist/
 out/
 .next/
+# .next-dev = the dev server's own build dir, .next-build = parallel builds
+.next-*/
 *.tsbuildinfo
+
+# cloud engine (Chopper) local artefacts
+# .cache = downloaded model weights + parity/bench output
+# /bin = native addon copied out of node_modules by server/chopperModel.mjs
+.cache/
+/bin/
 
 # accidental copies / local junk
 .git copy/

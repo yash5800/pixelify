@@ -17,7 +17,7 @@ const SITE_URL = 'https://pixelify.me';
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: 'Pixelify | Free On-Device AI Photo Editor | Image Upscaler & Background Remover',
-  description: 'Pixelify runs AI image upscaling and background removal entirely in your browser. Private, on-device, no uploads, no tracking. Free 4× super-resolution.',
+  description: 'Pixelify runs AI image upscaling and background removal entirely in your browser. Private, on-device by default, no tracking. Free 4× super-resolution.',
   keywords: [
     'AI image upscaler',
     'photo enhancer',
@@ -58,7 +58,7 @@ export const metadata: Metadata = {
     type: 'website',
     siteName: 'Pixelify',
     title: 'Pixelify: Free On-Device AI Photo Editor | Upscaler & BG Remover',
-    description: 'Upscale photos up to 8x and remove image backgrounds 100% in your browser. Zero cloud uploads, total privacy, powered by client-side WebGPU.',
+    description: 'Upscale photos up to 8x and remove image backgrounds 100% in your browser. On-device by default, total privacy, powered by client-side WebGPU.',
     url: SITE_URL,
     locale: 'en_US',
     images: [
@@ -123,7 +123,7 @@ const structuredData = {
         '8x AI Super-Resolution Image Upscaling',
         'Instant Background Removal (Chopper AI)',
         '100% On-Device In-Browser Processing',
-        'Zero Cloud Uploads & Absolute Privacy',
+        'On-Device by Default, Optional Cloud (CPU) Engine',
         'Side-by-side Before/After Comparison Slider',
       ],
       image: 'https://pixelify.me/og-image.jpg',
@@ -152,14 +152,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <h1>Pixelify: On-Device AI Photo Editor &amp; Background Remover</h1>
             <p>
               Pixelify delivers high-performance AI image upscaling and instant background removal
-              running 100% client-side in your web browser. No cloud uploads, no subscriptions,
-              and total data privacy.
+              running 100% client-side in your web browser. No cloud uploads by default, no
+              subscriptions, and total data privacy.
             </p>
             <h2>Key Features:</h2>
             <ul>
               <li><strong>AI Image Super-Resolution:</strong> Upscale images up to 4× with models including Vitality, Pixel-Dance, and Alpha-Satoru.</li>
               <li><strong>Chopper AI Background Removal:</strong> Remove backgrounds from portraits, e-commerce products, and graphics in seconds.</li>
-              <li><strong>100% On-Device Privacy:</strong> Photos are processed strictly in your device&apos;s memory using WebGPU &amp; WebAssembly. Nothing is ever saved or sent to any remote server.</li>
+              <li><strong>100% On-Device Privacy:</strong> Photos are processed strictly in your device&apos;s memory using WebGPU &amp; WebAssembly. Nothing is saved or sent to any remote server — unless you explicitly switch the Background Remover to the optional Cloud (CPU) engine, which uploads a single 512×512 thumbnail and keeps your full-resolution photo on your device.</li>
               <li><strong>Multi-Format Support:</strong> Works with PNG, JPEG, WEBP, and more.</li>
             </ul>
             <h2>Quick Navigation:</h2>

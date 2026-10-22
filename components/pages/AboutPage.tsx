@@ -114,6 +114,12 @@ export default function AboutPage({ onTabChange }: Props) {
           code never touches the AI tools: your images are still never uploaded anywhere.
         </P>
         <P>
+          One deliberate exception, named openly: the Background Remover can optionally run Chopper
+          on our CPU instead of on your device. It is off by default, it is opt-in per session, and
+          it transmits exactly one 512×512 thumbnail — never the original file — which our server
+          discards as soon as the request ends.
+        </P>
+        <P>
           For completeness: your browser does make a few ordinary requests to load the site: the
           application itself, the model files, fonts, and the open-source libraries that power
           inference. None of those requests contain your images. The full breakdown is in our

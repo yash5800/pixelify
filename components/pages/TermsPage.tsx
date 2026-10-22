@@ -71,6 +71,12 @@ export default function TermsPage({ onTabChange }: Props) {
           have.
         </P>
         <P>
+          The single exception is the optional Cloud (CPU) engine in the Background Remover. If
+          you switch it on, one 512×512 thumbnail of the image you are editing is sent to our
+          server for the length of that request so the model can segment it. We grant no licence
+          over it, we do not keep a copy, and your full-resolution image is never transmitted.
+        </P>
+        <P>
           You are solely responsible for the images you choose to process and for the outputs you
           produce with them. You must have the rights or consent required for whatever you process.
           For example, you should not use the tools on content you are not permitted to use, and

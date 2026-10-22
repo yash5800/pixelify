@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Scissors, Image as ImageIcon, Sparkles, SlidersHorizontal, PanelsTopLeft, Columns2, Undo2, Redo2, Download as DownloadIcon, ChevronDown, ZoomIn, ZoomOut, RotateCcw, RotateCw, Crop as CropIcon, Plus, FlipHorizontal, FlipVertical, Check, X } from 'lucide-react';
+import { Scissors, Image as ImageIcon, Sparkles, SlidersHorizontal, PanelsTopLeft, Columns2, Undo2, Redo2, Download as DownloadIcon, ChevronDown, ZoomIn, ZoomOut, RotateCcw, RotateCw, Crop as CropIcon, Plus, FlipHorizontal, FlipVertical, Check, X, Cpu, Cloud } from 'lucide-react';
 import UploadArea from './UploadArea';
 import BGComparator, { ImageAdjustments, ImageEffects } from './BGComparator';
 import type { FabricEditMode, FabricCropRatio, FabricImageEditorHandle, SubjectTransform } from './bgremove/FabricImageEditor';
 import { DEFAULT_SUBJECT_TRANSFORM } from './bgremove/FabricImageEditor';
 import { makeId, downloadName } from '../lib/bgUtils';
 import { bgRemoverService } from '../services/bgRemoverService';
+import { bgRemoverCloudService } from '../services/bgRemoverCloudService';
+import type { CloudEngineStatus } from '../services/bgRemoverCloudService';
 import type { BGJob } from '../types';
 import {
   TextLayer,
@@ -26,6 +28,84 @@ interface BGRemoveWorkspaceProps {
   onFileAdd?: (files: FileList | File[]) => void;
   /** Live engine reported by the processing worker ('wasm' | 'webgpu') */
   onEngineReport?: (engine: 'wasm' | 'webgpu', webgpuAvailable: boolean) => void;
+}
+
+/** Where the segmentation runs: on the visitor's device (default) or on our CPU. */
+type CutoutEngine = 'device' | 'cloud';
+
+/**
+ * Copy for the "Cloud (CPU)" panel. The engine is a serverless function, so
+ * the interesting part is *which* of the possible states the visitor is in —
+ * the panel spells that out instead of saying "not reachable" for every case.
+ */
+function cloudEngineCopy(
+  status: CloudEngineStatus | null,
+  runsLocally: boolean
+): { headline: string; detail: string } {
+  const where = runsLocally ? 'this machine' : 'the server';
+
+  if (!status) {
+    return {
+      headline: 'Checking whether the cloud engine is available…',
+      detail:
+        'The engine is a serverless function, so it only exists where a Node ' +
+        'server serves /api — the site itself is a static export.',
+    };
+  }
+
+  switch (status.reason) {
+    case 'ok':
+      return status.ready
+        ? {
+            headline: `Connected. The model is loaded and running on ${where}'s CPU.`,
+            detail:
+              'The browser downscales your photo to a 512×512 thumbnail (786 KB) ' +
+              'and posts it to /api/bg-remove. The server runs the same Chopper ' +
+              'model on its CPU and returns a 512×512 alpha mask (256 KB). The ' +
+              'mask is scaled up and composited over your original pixels here, so ' +
+              'the full-resolution photo never leaves this device.',
+          }
+        : {
+            headline: 'Connected, but the model is not loaded yet.',
+            detail:
+              'The first request downloads ~183 MB of weights; the server keeps ' +
+              'them warm afterwards. Everything else is unchanged: thumbnail up, ' +
+              'mask back, composite here.',
+          };
+    case 'warming-up':
+      return {
+        headline: 'The engine is up and downloading the model (~183 MB) for the first time.',
+        detail:
+          'The download continues in the background — try again in a few seconds. ' +
+          'The cutout itself is unchanged: thumbnail up, mask back, composite here.',
+      };
+    case 'not-mounted':
+      return {
+        headline: 'This server has no cloud engine mounted.',
+        detail:
+          'The site is a static export, so /api only exists where a Node server ' +
+          'serves it. Locally, run “npm run dev” and open http://127.0.0.1:3000 — ' +
+          'that server mounts the functions and the model then runs on your own ' +
+          'CPU, the same code path as the deployment. On Vercel the function is ' +
+          'mounted for you.',
+      };
+    case 'error':
+      return {
+        headline: 'The cloud engine answered but could not load the model.',
+        detail:
+          'Check /api/health?warm=1 on the server for the exact error. Until then ' +
+          'On-device still works and runs the same model in your browser.',
+      };
+    case 'unreachable':
+    default:
+      return {
+        headline: 'The request to /api/health never got an answer.',
+        detail:
+          'Nothing is serving the functions on this origin — the dev server only ' +
+          'serves the site. Start them with “npm run dev”, or deploy to ' +
+          'Vercel. On-device keeps working in the meantime.',
+      };
+  }
 }
 
 type TabType = 'cutout' | 'background' | 'effects' | 'adjust' | 'design';
@@ -96,6 +176,10 @@ export default function BGRemoveWorkspace({
 }: BGRemoveWorkspaceProps) {
   const [selectedId, setSelectedId] = useState<string | null>(jobs[0]?.id || null);
   const [activeTab, setActiveTab] = useState<TabType>('cutout');
+  // On-device stays the default; the cloud engine is opt-in.
+  const [cutoutEngine, setCutoutEngine] = useState<CutoutEngine>('device');
+  const [cloudStatus, setCloudStatus] = useState<CloudEngineStatus | null>(null);
+  const [cloudHost, setCloudHost] = useState('');
   const [bgSubTab, setBgSubTab] = useState<BgSubTab>('photo');
   const [designSubTab, setDesignSubTab] = useState<DesignSubTab>('text');
   const [elementCategory, setElementCategory] = useState<'all' | 'badges' | 'shapes' | 'stickers'>('all');
@@ -121,6 +205,10 @@ export default function BGRemoveWorkspace({
   const [cropZoom, setCropZoom] = useState(100);
   const [subjectTransform, setSubjectTransform] = useState<SubjectTransform>(DEFAULT_SUBJECT_TRANSFORM);
   const fabricEditorRef = useRef<FabricImageEditorHandle | null>(null);
+  // Identifies the newest cutout run so a superseded run (e.g. the on-device
+  // download still reporting progress after the user switched to the cloud
+  // engine) cannot overwrite the job state.
+  const runTokenRef = useRef(0);
   const savedTransformBeforeEditRef = useRef<SubjectTransform>(DEFAULT_SUBJECT_TRANSFORM);
   const editorHistoryRef = useRef<{ past: EditorSnapshot[]; future: EditorSnapshot[] }>({ past: [], future: [] });
 
@@ -190,6 +278,31 @@ export default function BGRemoveWorkspace({
     return unsubscribe;
   }, [onEngineReport]);
 
+  // The cloud engine is optional: the site itself is a static export, so the
+  // function may not be mounted. Probe it once so the UI can explain which
+  // of the possible reasons applies.
+  useEffect(() => {
+    let cancelled = false;
+    setCloudHost(window.location.hostname);
+    void bgRemoverCloudService.getStatus().then((status) => {
+      if (!cancelled) setCloudStatus(status);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // "localhost" means the functions are mounted by a local Node server, so the
+  // model runs on the visitor's own CPU — the same code path as the deployment.
+  const cloudRunsLocally =
+    cloudHost === 'localhost' || cloudHost === '127.0.0.1' || cloudHost === '::1';
+  const cloudCopy = cloudEngineCopy(cloudStatus, cloudRunsLocally);
+
+  /** Re-read /api/health — the model may have finished loading meanwhile. */
+  const refreshCloudStatus = () => {
+    void bgRemoverCloudService.getStatus(true).then(setCloudStatus);
+  };
+
   const selected = jobs.find((job) => job.id === selectedId) ?? jobs[0];
 
   useEffect(() => {
@@ -245,13 +358,19 @@ export default function BGRemoveWorkspace({
   };
 
   async function processJob(job: BGJob) {
+    const useCloud = cutoutEngine === 'cloud';
+    const runToken = (runTokenRef.current += 1);
+    const isStale = () => runToken !== runTokenRef.current;
     const serviceState = bgRemoverService.getState();
-    const isModelReady = serviceState.isReady;
+    // The cloud engine has no local weights to wait for.
+    const isModelReady = useCloud ? true : serviceState.isReady;
 
     let currentProgress = isModelReady ? 15 : 5;
-    let currentMessage = isModelReady
-      ? 'Analyzing image pixels...'
-      : 'Loading AI vision model weights...';
+    let currentMessage = useCloud
+      ? 'Preparing thumbnail for the cloud engine...'
+      : isModelReady
+        ? 'Analyzing image pixels...'
+        : 'Loading AI vision model weights...';
 
     updateJob(job.id, {
       status: isModelReady ? 'processing' : 'loading',
@@ -264,6 +383,10 @@ export default function BGRemoveWorkspace({
       if (tickerInterval) clearInterval(tickerInterval);
       currentProgress = Math.max(currentProgress, startPct);
       tickerInterval = setInterval(() => {
+        if (isStale()) {
+          if (tickerInterval) clearInterval(tickerInterval);
+          return;
+        }
         if (currentProgress < targetPct) {
           const remaining = targetPct - currentProgress;
           const step = Math.max(1, Math.round(remaining * 0.12));
@@ -293,41 +416,63 @@ export default function BGRemoveWorkspace({
     }
 
     try {
-      const { blob, elapsedMs } = await bgRemoverService.removeBackground(
-        job.id,
-        job.sourceUrl,
-        (pct, isWeights) => {
-          if (isWeights || pct > 0) {
-            const mapped = Math.min(60, Math.max(5, Math.round(5 + pct * 0.55)));
-            currentProgress = Math.max(currentProgress, mapped);
-            currentMessage = `Downloading AI vision model (${pct}%)...`;
-            updateJob(job.id, {
-              status: 'loading',
-              progress: currentProgress,
-              message: currentMessage,
-            });
-            if (pct >= 100) {
-              startTicker(65, 92);
-            }
-          }
-        },
-        (stage, msg) => {
-          if (stage === 'running-inference') {
-            startTicker(Math.max(currentProgress, 40), 92);
-          } else if (stage === 'encoding-output') {
-            if (tickerInterval) clearInterval(tickerInterval);
-            currentProgress = Math.max(currentProgress, 94);
-            currentMessage = msg || 'Encoding transparent PNG...';
-            updateJob(job.id, {
-              status: 'processing',
-              progress: currentProgress,
-              message: currentMessage,
-            });
+      const onProgress = (pct: number, isWeights?: boolean) => {
+        if (isStale()) return;
+        if (isWeights || pct > 0) {
+          const mapped = Math.min(60, Math.max(5, Math.round(5 + pct * 0.55)));
+          currentProgress = Math.max(currentProgress, mapped);
+          currentMessage = `Downloading AI vision model (${pct}%)...`;
+          updateJob(job.id, {
+            status: 'loading',
+            progress: currentProgress,
+            message: currentMessage,
+          });
+          if (pct >= 100) {
+            startTicker(65, 92);
           }
         }
-      );
+      };
+      const onStage = (stage: string, msg?: string) => {
+        if (isStale()) return;
+        if (stage === 'running-inference') {
+          startTicker(Math.max(currentProgress, 40), 92);
+        } else if (stage === 'encoding-output') {
+          if (tickerInterval) clearInterval(tickerInterval);
+          currentProgress = Math.max(currentProgress, 94);
+          currentMessage = msg || 'Encoding transparent PNG...';
+          updateJob(job.id, {
+            status: 'processing',
+            progress: currentProgress,
+            message: currentMessage,
+          });
+        }
+      };
+
+      const { blob, elapsedMs } = useCloud
+        ? await bgRemoverCloudService.removeBackground(job.sourceUrl, (stage, msg) =>
+            onStage(stage, msg)
+          )
+        : await bgRemoverService.removeBackground(
+            job.id,
+            job.sourceUrl,
+            onProgress,
+            onStage
+          );
+
+      // A successful cloud cutout means the model is loaded on the server.
+      // The panel was probed before that, so re-read the status — otherwise it
+      // keeps claiming "the model is not loaded yet".
+      if (useCloud) {
+        void bgRemoverCloudService.getStatus(true).then((status) => {
+          if (!isStale()) setCloudStatus(status);
+        });
+      }
 
       if (tickerInterval) clearInterval(tickerInterval);
+
+      // A newer run owns the job now — drop this result instead of
+      // overwriting the fresher one.
+      if (isStale()) return;
 
       updateJob(job.id, {
         status: 'processing',
@@ -357,11 +502,14 @@ export default function BGRemoveWorkspace({
       addToast('success', `${job.name} background removed!`);
     } catch (err: any) {
       if (tickerInterval) clearInterval(tickerInterval);
+      if (isStale()) return;
       console.error('processJob failed:', err);
       const rawMessage = String(err?.message || '');
       const userMessage = /webgpu|onnxruntime|ortRun|buffer|adapter|device lost/i.test(rawMessage)
         ? 'Background removal hit a graphics-processing error. Please retry; if it happens again, reload the page and try once more.'
-        : 'Could not remove this background. Please try another image or retry.';
+        : /cloud engine/i.test(rawMessage)
+          ? rawMessage
+          : 'Could not remove this background. Please try another image or retry.';
       updateJob(job.id, {
         status: 'error',
         message: userMessage,
@@ -1121,6 +1269,52 @@ export default function BGRemoveWorkspace({
                               <span>Restore</span>
                             </button>
                           </div>
+                        </div>
+
+                        {/* PROCESSING ENGINE: ON-DEVICE (DEFAULT) OR CLOUD (CPU) */}
+                        <div>
+                          <span className="text-slate-800 dark:text-white font-bold block mb-1.5">
+                            Processing Engine
+                          </span>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setCutoutEngine('device')}
+                              aria-pressed={cutoutEngine === 'device'}
+                              className={`py-2.5 px-2 rounded-2xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${cutoutEngine === 'device'
+                                ? 'bg-blue-600 border-blue-500 text-white shadow-md shadow-blue-500/20'
+                                : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-700 dark:text-neutral-300 hover:bg-zinc-500'
+                                }`}
+                              title="Runs the model on this device (WebGPU when available, otherwise WASM)."
+                            >
+                              <Cpu className="h-3.5 w-3.5" aria-hidden="true" />
+                              <span>On-device</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCutoutEngine('cloud');
+                                refreshCloudStatus();
+                              }}
+                              aria-pressed={cutoutEngine === 'cloud'}
+                              className={`py-2.5 px-2 rounded-2xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${cutoutEngine === 'cloud'
+                                ? 'bg-blue-600 border-blue-500 text-white shadow-md shadow-blue-500/20'
+                                : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-700 dark:text-neutral-300 hover:bg-zinc-500'
+                                }`}
+                              title="Runs the model on our CPU. Only a 512x512 thumbnail is uploaded."
+                            >
+                              <Cloud className="h-3.5 w-3.5" aria-hidden="true" />
+                              <span>Cloud (CPU)</span>
+                            </button>
+                          </div>
+                          {cutoutEngine === 'cloud' && (
+                            <div className="mt-2 space-y-1.5 text-[10.5px] leading-relaxed text-slate-600 dark:text-neutral-400">
+                              <p className="font-semibold text-slate-700 dark:text-neutral-200">
+                                {cloudCopy.headline}
+                              </p>
+                              <p>{cloudCopy.detail}</p>
+                            </div>
+                          )}
                         </div>
 
                         {/* QUICK SHORTCUT HINT */}

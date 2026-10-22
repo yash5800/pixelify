@@ -26,17 +26,25 @@ export default function PrivacyPage({ onTabChange }: Props) {
       title="Privacy Policy"
       description="Pixelify processes your images on your own device. This policy lists exactly what
       that means: what is stored, what is requested over the network, and what never happens."
-      updated="Last updated: October 12, 2026"
+      updated="Last updated: October 22, 2026"
       toc={TOC}
       documentTitle="Privacy Policy: Pixelify"
-      metaDescription="Pixelify's privacy policy: no accounts, no image uploads, no analytics, no
-      first-party cookies. What your browser stores locally and which network requests the site makes, in full."
+      metaDescription="Pixelify's privacy policy: no accounts, no analytics, no first-party cookies.
+      What your browser stores locally, and exactly what the optional cloud engine sends, in full."
       onTabChange={onTabChange}
     >
       <Section id="summary" num={1} title="The short version">
         <Callout title="If you read nothing else">
           <ul className="space-y-1.5">
-            <li>· Your images are never uploaded. All processing happens inside your browser.</li>
+            <li>
+              · By default your images are never uploaded. All processing happens inside your
+              browser.
+            </li>
+            <li>
+              · The Background Remover has an optional "Cloud (CPU)" engine you can switch on.
+              It sends one 512×512 thumbnail (786 KB) of your image to our own server and nothing
+              else; the full-resolution photo never leaves your device.
+            </li>
             <li>· We have no accounts, so we hold no names, emails or passwords.</li>
             <li>· No analytics, no tracking pixels, no first-party cookies.</li>
             <li>
@@ -55,14 +63,27 @@ export default function PrivacyPage({ onTabChange }: Props) {
           describe the behaviour of the actual application, and you are welcome to check it against
           the source.
         </P>
+        <P>
+          One feature is server-backed, and we name it up front: the Background Remover can run
+          Chopper on our CPU instead of on your device when you pick the <strong>Cloud (CPU)</strong>
+          engine. That engine is off by default and is described in full in
+          &quot;Network requests the site makes&quot; and &quot;Your rights &amp; choices&quot; below.
+        </P>
       </Section>
 
       <Section id="what-we-dont" num={2} title="What we never collect">
-        <P>Because Pixelify has no backend, the following are structurally impossible:</P>
+        <P>
+          Pixelify has no accounts, no database and no analytics. The following are structurally
+          impossible:
+        </P>
         <UL
           items={[
             <>
-              <strong>Your images.</strong> Files you drop, paste or select are read into memory on your device. No pixel, thumbnail or file name is transmitted to us or to any image-processing server.
+              <strong>Your full-resolution images.</strong> Files you drop, paste or select are read
+              into memory on your device and are processed there. No original file, file name or
+              full-resolution pixel is ever transmitted to us or to any image-processing server —
+              not even when you use the optional Cloud (CPU) engine, which only ever receives a
+              512×512 thumbnail.
             </>,
             <>
               <strong>Account data.</strong> There is no registration, login, email capture or password.
@@ -79,7 +100,8 @@ export default function PrivacyPage({ onTabChange }: Props) {
             <>
               <strong>Selling data.</strong> We have no bulk data to sell and no advertising
               relationship that involves your content. The ad partner only sees what ad
-              networks see on any site (see "Advertising").
+              networks see on any site (see "Advertising"). The cloud engine is not an ad or
+              analytics service and shares nothing with either.
             </>,
             <>
               <strong>Cookies.</strong>
@@ -110,7 +132,7 @@ export default function PrivacyPage({ onTabChange }: Props) {
             </>,
             <>
               <strong>Model cache (Cache Storage).</strong> Neural model files you have used
-              (roughly 2MB to 67MB for the upscaler, about 40MB for the background remover) are cached so
+              (roughly 2MB to 67MB for the upscaler, about 183MB for the background remover) are cached so
               they do not re-download on every visit. These are stock model weights, not data
               about you.
             </>,
@@ -142,12 +164,23 @@ export default function PrivacyPage({ onTabChange }: Props) {
               <strong>Model files.</strong> Upscaler models are fetched from the same domain as the
               site and then cached by your browser. The background remover's Chopper model is
               downloaded through Transformers.js from the
-              <a href="https://huggingface.co" target="_blank" rel="noreferrer"> Hugging Face</a> model hub. It is a one-time ~40 MB file that is then cached. These requests contain a URL and nothing about your images.
+              <a href="https://huggingface.co" target="_blank" rel="noreferrer"> Hugging Face</a> model hub. It is a one-time ~183 MB file that is then cached. These requests contain a URL and nothing about your images.
             </>,
             <>
               <strong>Open-source libraries.</strong> ONNX Runtime Web (the inference engine) and
               its WebAssembly binaries are loaded from
               <a href="https://www.jsdelivr.com" target="_blank" rel="noreferrer"> jsDelivr</a>, a public content-delivery network. jsDelivr serves the library file; it never sees your images.
+            </>,
+            <>
+              <strong>The optional Cloud (CPU) engine.</strong> This request happens only if you
+              explicitly select the Cloud (CPU) engine in the Background Remover. The browser then
+              sends one <code>POST</code> to <code>/api/bg-remove</code> on our own hosting
+              (Vercel) containing a 512×512 RGB thumbnail of your image (786,432 bytes), and
+              receives a 512×512 alpha mask (262,144 bytes) back. The server runs the same Chopper
+              model, holds the thumbnail only for the length of the request, and writes it nowhere.
+              The full-resolution photo stays in your browser, where the mask is composited over
+              it. Vercel logs the invocation like any other request (IP address, user agent, time,
+              function name) — no image data is logged, and no third party sees the thumbnail.
             </>,
             <>
               <strong>Fonts.</strong> Typefaces are served by Google Fonts. Google receives the
@@ -158,7 +191,9 @@ export default function PrivacyPage({ onTabChange }: Props) {
         />
         <P>
           That is the complete list of requests the site itself makes. Advertising (AdSense) adds
-          one more, described in its own section below, since it involves third-party cookies.
+          one more, described in its own section below, since it involves third-party cookies. The
+          optional cloud engine is the only request that carries image data, and it carries a
+          thumbnail you can inspect in your browser's Network tab before you send it.
         </P>
       </Section>
 
@@ -200,13 +235,15 @@ export default function PrivacyPage({ onTabChange }: Props) {
 
       <Section id="thirdparties" num={6} title="Third parties">
         <P>
-          Summarised: <strong>Vercel</strong> (hosting), <strong>Hugging Face</strong>
+          Summarised: <strong>Vercel</strong> (hosting, and the optional cloud engine),
+          <strong>Hugging Face</strong>
           (background-removal model weights), <strong>jsDelivr</strong> (inference libraries),
           <strong> Google Fonts</strong> (typefaces) and <strong>Google AdSense</strong>
           (advertising). Each processes the limited request data
           described above under its own privacy policy; we have no commercial relationship with
           them that involves your content, and we do not send them anything beyond ordinary asset
-          requests.
+          requests. The optional cloud engine adds no new party: it runs on our own Vercel
+          function, and no third party receives your thumbnail.
         </P>
         <P>
           External links inside our articles lead to third-party sites. Their practices are governed
@@ -219,14 +256,15 @@ export default function PrivacyPage({ onTabChange }: Props) {
           Because we hold no personal data, there is no stored profile to access, correct, export
           or delete on our side; the usual data-subject requests have nothing to attach to. The
           data that exists about your usage lives in your browser, under your control:
-        </P>
-        <UL
-          items={[
-            'Clear site data for this origin in your browser settings to erase preferences and model caches instantly.',
-            'Block notifications: the optional desktop "done" alert uses the browser notification permission, which you can grant, deny or revoke at any time in browser settings. We ask only when you start a job.',
-            'Use private/incognito browsing and nothing persists at all after the tab closes.',
-          ]}
-        />
+        </P>          <UL
+            items={[
+              'Clear site data for this origin in your browser settings to erase preferences and model caches instantly.',
+              'Block notifications: the optional desktop "done" alert uses the browser notification permission, which you can grant, deny or revoke at any time in browser settings. We ask only when you start a job.',
+              'Use private/incognito browsing and nothing persists at all after the tab closes.',
+              'Never use the Cloud (CPU) engine. The on-device engine is the default, needs no server at all, and keeps every pixel on your device.',
+              'Switching back from the Cloud (CPU) engine to the on-device engine stops all further uploads; only the requests already listed above have happened.',
+            ]}
+          />
         <P>
           If you are in a jurisdiction with statutory data rights (GDPR, CCPA and similar), you
           hold all of them; to the extent any apply, note that the exercise cost to us is zero,
@@ -244,7 +282,7 @@ export default function PrivacyPage({ onTabChange }: Props) {
 
       <Section id="changes" num={9} title="Changes to this policy">
         <P>
-          If this policy ever changes, for example if a future feature involves a server, the
+          If this policy ever changes, the
           updated version will be published on this page with a revised date at the top, and any
           change that alters what leaves your device will be called out on the products page and
           the blog before it takes effect. We do not notify users individually because we have no

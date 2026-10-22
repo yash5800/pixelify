@@ -1,0 +1,853 @@
+{
+  "generatedAt": "2026-10-20T13:06:07.801Z",
+  "base": "http://127.0.0.1:4321",
+  "threshold": 1000,
+  "pages": [
+    {
+      "route": "/404",
+      "label": "404 Not Found",
+      "group": "Main pages",
+      "renderedTotal": 89,
+      "renderedContent": 25,
+      "renderedWords": 89,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/about/",
+      "label": "About",
+      "group": "Main pages",
+      "renderedTotal": 1034,
+      "renderedContent": 970,
+      "renderedWords": 1034,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/bg_remove/",
+      "label": "Background Remover",
+      "group": "Main pages",
+      "renderedTotal": 673,
+      "renderedContent": 609,
+      "renderedWords": 673,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/",
+      "label": "Blog index",
+      "group": "Main pages",
+      "renderedTotal": 710,
+      "renderedContent": 646,
+      "renderedWords": 440,
+      "renderedCjk": 270
+    },
+    {
+      "route": "/",
+      "label": "Home",
+      "group": "Main pages",
+      "renderedTotal": 1334,
+      "renderedContent": 1270,
+      "renderedWords": 1334,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/privacy/",
+      "label": "Privacy Policy",
+      "group": "Main pages",
+      "renderedTotal": 1436,
+      "renderedContent": 1372,
+      "renderedWords": 1436,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/products/",
+      "label": "Products",
+      "group": "Main pages",
+      "renderedTotal": 836,
+      "renderedContent": 772,
+      "renderedWords": 836,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/story/",
+      "label": "Story",
+      "group": "Main pages",
+      "renderedTotal": 83,
+      "renderedContent": 19,
+      "renderedWords": 83,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/terms/",
+      "label": "Terms of Service",
+      "group": "Main pages",
+      "renderedTotal": 1385,
+      "renderedContent": 1321,
+      "renderedWords": 1385,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/truckbg/",
+      "label": "Truck BG",
+      "group": "Main pages",
+      "renderedTotal": 64,
+      "renderedContent": 0,
+      "renderedWords": 64,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/upscaler/",
+      "label": "AI Upscaler",
+      "group": "Main pages",
+      "renderedTotal": 825,
+      "renderedContent": 761,
+      "renderedWords": 825,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/en/",
+      "label": "Blog index — English",
+      "group": "Blog indexes",
+      "renderedTotal": 502,
+      "renderedContent": 438,
+      "renderedWords": 497,
+      "renderedCjk": 5
+    },
+    {
+      "route": "/blogs/fr/",
+      "label": "Blog index — Français",
+      "group": "Blog indexes",
+      "renderedTotal": 589,
+      "renderedContent": 525,
+      "renderedWords": 584,
+      "renderedCjk": 5
+    },
+    {
+      "route": "/blogs/hi/",
+      "label": "Blog index — हिन्दी",
+      "group": "Blog indexes",
+      "renderedTotal": 565,
+      "renderedContent": 501,
+      "renderedWords": 556,
+      "renderedCjk": 9
+    },
+    {
+      "route": "/blogs/ja/",
+      "label": "Blog index — 日本語",
+      "group": "Blog indexes",
+      "renderedTotal": 1142,
+      "renderedContent": 1078,
+      "renderedWords": 251,
+      "renderedCjk": 891
+    },
+    {
+      "route": "/blogs/ru/",
+      "label": "Blog index — Русский",
+      "group": "Blog indexes",
+      "renderedTotal": 508,
+      "renderedContent": 444,
+      "renderedWords": 503,
+      "renderedCjk": 5
+    },
+    {
+      "route": "/blogs/zh/",
+      "label": "Blog index — 中文",
+      "group": "Blog indexes",
+      "renderedTotal": 795,
+      "renderedContent": 731,
+      "renderedWords": 248,
+      "renderedCjk": 547
+    },
+    {
+      "route": "/blogs/bg_remover_advantages_f9d2a6/",
+      "label": "English — bg remover advantages f9d2a6",
+      "group": "Blog posts (en)",
+      "renderedTotal": 1374,
+      "renderedContent": 1310,
+      "renderedWords": 1374,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/bg_remover_what_it_does_c4e8b2/",
+      "label": "English — bg remover what it does c4e8b2",
+      "group": "Blog posts (en)",
+      "renderedTotal": 1522,
+      "renderedContent": 1458,
+      "renderedWords": 1522,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/data_harvesting_warning_a9e5b7/",
+      "label": "English — data harvesting warning a9e5b7",
+      "group": "Blog posts (en)",
+      "renderedTotal": 1361,
+      "renderedContent": 1297,
+      "renderedWords": 1361,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/en/bg_remover_advantages_f9d2a6/",
+      "label": "English — bg remover advantages f9d2a6",
+      "group": "Blog posts (en)",
+      "renderedTotal": 1374,
+      "renderedContent": 1310,
+      "renderedWords": 1374,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/en/bg_remover_what_it_does_c4e8b2/",
+      "label": "English — bg remover what it does c4e8b2",
+      "group": "Blog posts (en)",
+      "renderedTotal": 1522,
+      "renderedContent": 1458,
+      "renderedWords": 1522,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/en/data_harvesting_warning_a9e5b7/",
+      "label": "English — data harvesting warning a9e5b7",
+      "group": "Blog posts (en)",
+      "renderedTotal": 1361,
+      "renderedContent": 1297,
+      "renderedWords": 1361,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/en/enable_webgpu_guide_b5c9e8/",
+      "label": "English — enable webgpu guide b5c9e8",
+      "group": "Blog posts (en)",
+      "renderedTotal": 1409,
+      "renderedContent": 1345,
+      "renderedWords": 1409,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/en/local_ai_in_browser_d2f9c4/",
+      "label": "English — local ai in browser d2f9c4",
+      "group": "Blog posts (en)",
+      "renderedTotal": 1515,
+      "renderedContent": 1451,
+      "renderedWords": 1515,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/en/pc_vs_mobile_speed_c8d4f2/",
+      "label": "English — pc vs mobile speed c8d4f2",
+      "group": "Blog posts (en)",
+      "renderedTotal": 1395,
+      "renderedContent": 1331,
+      "renderedWords": 1395,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/en/pixelify_privacy_first_a7f3d9/",
+      "label": "English — pixelify privacy first a7f3d9",
+      "group": "Blog posts (en)",
+      "renderedTotal": 1678,
+      "renderedContent": 1614,
+      "renderedWords": 1678,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/en/restore_old_photos_g3b8e5/",
+      "label": "English — restore old photos g3b8e5",
+      "group": "Blog posts (en)",
+      "renderedTotal": 1425,
+      "renderedContent": 1361,
+      "renderedWords": 1425,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/en/upscaler_advantages_e5a8d3/",
+      "label": "English — upscaler advantages e5a8d3",
+      "group": "Blog posts (en)",
+      "renderedTotal": 1457,
+      "renderedContent": 1393,
+      "renderedWords": 1457,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/en/upscaler_how_it_works_b7c3e1/",
+      "label": "English — upscaler how it works b7c3e1",
+      "group": "Blog posts (en)",
+      "renderedTotal": 1386,
+      "renderedContent": 1322,
+      "renderedWords": 1386,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/en/webgpu_vs_wasm_f4a7d6/",
+      "label": "English — webgpu vs wasm f4a7d6",
+      "group": "Blog posts (en)",
+      "renderedTotal": 1410,
+      "renderedContent": 1346,
+      "renderedWords": 1410,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/enable_webgpu_guide_b5c9e8/",
+      "label": "English — enable webgpu guide b5c9e8",
+      "group": "Blog posts (en)",
+      "renderedTotal": 1409,
+      "renderedContent": 1345,
+      "renderedWords": 1409,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/local_ai_in_browser_d2f9c4/",
+      "label": "English — local ai in browser d2f9c4",
+      "group": "Blog posts (en)",
+      "renderedTotal": 1515,
+      "renderedContent": 1451,
+      "renderedWords": 1515,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/pc_vs_mobile_speed_c8d4f2/",
+      "label": "English — pc vs mobile speed c8d4f2",
+      "group": "Blog posts (en)",
+      "renderedTotal": 1395,
+      "renderedContent": 1331,
+      "renderedWords": 1395,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/pixelify_privacy_first_a7f3d9/",
+      "label": "English — pixelify privacy first a7f3d9",
+      "group": "Blog posts (en)",
+      "renderedTotal": 1678,
+      "renderedContent": 1614,
+      "renderedWords": 1678,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/restore_old_photos_g3b8e5/",
+      "label": "English — restore old photos g3b8e5",
+      "group": "Blog posts (en)",
+      "renderedTotal": 1425,
+      "renderedContent": 1361,
+      "renderedWords": 1425,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/upscaler_advantages_e5a8d3/",
+      "label": "English — upscaler advantages e5a8d3",
+      "group": "Blog posts (en)",
+      "renderedTotal": 1457,
+      "renderedContent": 1393,
+      "renderedWords": 1457,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/upscaler_how_it_works_b7c3e1/",
+      "label": "English — upscaler how it works b7c3e1",
+      "group": "Blog posts (en)",
+      "renderedTotal": 1386,
+      "renderedContent": 1322,
+      "renderedWords": 1386,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/webgpu_vs_wasm_f4a7d6/",
+      "label": "English — webgpu vs wasm f4a7d6",
+      "group": "Blog posts (en)",
+      "renderedTotal": 1410,
+      "renderedContent": 1346,
+      "renderedWords": 1410,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/fr/bg_remover_advantages_f9d2a6/",
+      "label": "Français — bg remover advantages f9d2a6",
+      "group": "Blog posts (fr)",
+      "renderedTotal": 1640,
+      "renderedContent": 1576,
+      "renderedWords": 1640,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/fr/bg_remover_what_it_does_c4e8b2/",
+      "label": "Français — bg remover what it does c4e8b2",
+      "group": "Blog posts (fr)",
+      "renderedTotal": 1739,
+      "renderedContent": 1675,
+      "renderedWords": 1739,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/fr/data_harvesting_warning_a9e5b7/",
+      "label": "Français — data harvesting warning a9e5b7",
+      "group": "Blog posts (fr)",
+      "renderedTotal": 1568,
+      "renderedContent": 1504,
+      "renderedWords": 1568,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/fr/enable_webgpu_guide_b5c9e8/",
+      "label": "Français — enable webgpu guide b5c9e8",
+      "group": "Blog posts (fr)",
+      "renderedTotal": 1673,
+      "renderedContent": 1609,
+      "renderedWords": 1673,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/fr/local_ai_in_browser_d2f9c4/",
+      "label": "Français — local ai in browser d2f9c4",
+      "group": "Blog posts (fr)",
+      "renderedTotal": 1775,
+      "renderedContent": 1711,
+      "renderedWords": 1775,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/fr/pc_vs_mobile_speed_c8d4f2/",
+      "label": "Français — pc vs mobile speed c8d4f2",
+      "group": "Blog posts (fr)",
+      "renderedTotal": 1663,
+      "renderedContent": 1599,
+      "renderedWords": 1663,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/fr/pixelify_privacy_first_a7f3d9/",
+      "label": "Français — pixelify privacy first a7f3d9",
+      "group": "Blog posts (fr)",
+      "renderedTotal": 1979,
+      "renderedContent": 1915,
+      "renderedWords": 1979,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/fr/restore_old_photos_g3b8e5/",
+      "label": "Français — restore old photos g3b8e5",
+      "group": "Blog posts (fr)",
+      "renderedTotal": 1640,
+      "renderedContent": 1576,
+      "renderedWords": 1640,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/fr/upscaler_advantages_e5a8d3/",
+      "label": "Français — upscaler advantages e5a8d3",
+      "group": "Blog posts (fr)",
+      "renderedTotal": 1726,
+      "renderedContent": 1662,
+      "renderedWords": 1726,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/fr/upscaler_how_it_works_b7c3e1/",
+      "label": "Français — upscaler how it works b7c3e1",
+      "group": "Blog posts (fr)",
+      "renderedTotal": 1655,
+      "renderedContent": 1591,
+      "renderedWords": 1655,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/fr/webgpu_vs_wasm_f4a7d6/",
+      "label": "Français — webgpu vs wasm f4a7d6",
+      "group": "Blog posts (fr)",
+      "renderedTotal": 1624,
+      "renderedContent": 1560,
+      "renderedWords": 1624,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/zh/bg_remover_advantages_f9d2a6/",
+      "label": "中文 — bg remover advantages f9d2a6",
+      "group": "Blog posts (zh)",
+      "renderedTotal": 2490,
+      "renderedContent": 2426,
+      "renderedWords": 203,
+      "renderedCjk": 2287
+    },
+    {
+      "route": "/blogs/zh/bg_remover_what_it_does_c4e8b2/",
+      "label": "中文 — bg remover what it does c4e8b2",
+      "group": "Blog posts (zh)",
+      "renderedTotal": 2519,
+      "renderedContent": 2455,
+      "renderedWords": 204,
+      "renderedCjk": 2315
+    },
+    {
+      "route": "/blogs/zh/data_harvesting_warning_a9e5b7/",
+      "label": "中文 — data harvesting warning a9e5b7",
+      "group": "Blog posts (zh)",
+      "renderedTotal": 2461,
+      "renderedContent": 2397,
+      "renderedWords": 198,
+      "renderedCjk": 2263
+    },
+    {
+      "route": "/blogs/zh/enable_webgpu_guide_b5c9e8/",
+      "label": "中文 — enable webgpu guide b5c9e8",
+      "group": "Blog posts (zh)",
+      "renderedTotal": 2435,
+      "renderedContent": 2371,
+      "renderedWords": 274,
+      "renderedCjk": 2161
+    },
+    {
+      "route": "/blogs/zh/local_ai_in_browser_d2f9c4/",
+      "label": "中文 — local ai in browser d2f9c4",
+      "group": "Blog posts (zh)",
+      "renderedTotal": 2739,
+      "renderedContent": 2675,
+      "renderedWords": 237,
+      "renderedCjk": 2502
+    },
+    {
+      "route": "/blogs/zh/pc_vs_mobile_speed_c8d4f2/",
+      "label": "中文 — pc vs mobile speed c8d4f2",
+      "group": "Blog posts (zh)",
+      "renderedTotal": 2492,
+      "renderedContent": 2428,
+      "renderedWords": 220,
+      "renderedCjk": 2272
+    },
+    {
+      "route": "/blogs/zh/pixelify_privacy_first_a7f3d9/",
+      "label": "中文 — pixelify privacy first a7f3d9",
+      "group": "Blog posts (zh)",
+      "renderedTotal": 3091,
+      "renderedContent": 3027,
+      "renderedWords": 215,
+      "renderedCjk": 2876
+    },
+    {
+      "route": "/blogs/zh/restore_old_photos_g3b8e5/",
+      "label": "中文 — restore old photos g3b8e5",
+      "group": "Blog posts (zh)",
+      "renderedTotal": 2460,
+      "renderedContent": 2396,
+      "renderedWords": 210,
+      "renderedCjk": 2250
+    },
+    {
+      "route": "/blogs/zh/upscaler_advantages_e5a8d3/",
+      "label": "中文 — upscaler advantages e5a8d3",
+      "group": "Blog posts (zh)",
+      "renderedTotal": 2635,
+      "renderedContent": 2571,
+      "renderedWords": 207,
+      "renderedCjk": 2428
+    },
+    {
+      "route": "/blogs/zh/upscaler_how_it_works_b7c3e1/",
+      "label": "中文 — upscaler how it works b7c3e1",
+      "group": "Blog posts (zh)",
+      "renderedTotal": 2418,
+      "renderedContent": 2354,
+      "renderedWords": 208,
+      "renderedCjk": 2210
+    },
+    {
+      "route": "/blogs/zh/webgpu_vs_wasm_f4a7d6/",
+      "label": "中文 — webgpu vs wasm f4a7d6",
+      "group": "Blog posts (zh)",
+      "renderedTotal": 2308,
+      "renderedContent": 2244,
+      "renderedWords": 238,
+      "renderedCjk": 2070
+    },
+    {
+      "route": "/blogs/ja/bg_remover_advantages_f9d2a6/",
+      "label": "日本語 — bg remover advantages f9d2a6",
+      "group": "Blog posts (ja)",
+      "renderedTotal": 3812,
+      "renderedContent": 3748,
+      "renderedWords": 225,
+      "renderedCjk": 3587
+    },
+    {
+      "route": "/blogs/ja/bg_remover_what_it_does_c4e8b2/",
+      "label": "日本語 — bg remover what it does c4e8b2",
+      "group": "Blog posts (ja)",
+      "renderedTotal": 4174,
+      "renderedContent": 4110,
+      "renderedWords": 233,
+      "renderedCjk": 3941
+    },
+    {
+      "route": "/blogs/ja/data_harvesting_warning_a9e5b7/",
+      "label": "日本語 — data harvesting warning a9e5b7",
+      "group": "Blog posts (ja)",
+      "renderedTotal": 3771,
+      "renderedContent": 3707,
+      "renderedWords": 206,
+      "renderedCjk": 3565
+    },
+    {
+      "route": "/blogs/ja/enable_webgpu_guide_b5c9e8/",
+      "label": "日本語 — enable webgpu guide b5c9e8",
+      "group": "Blog posts (ja)",
+      "renderedTotal": 3886,
+      "renderedContent": 3822,
+      "renderedWords": 292,
+      "renderedCjk": 3594
+    },
+    {
+      "route": "/blogs/ja/local_ai_in_browser_d2f9c4/",
+      "label": "日本語 — local ai in browser d2f9c4",
+      "group": "Blog posts (ja)",
+      "renderedTotal": 4441,
+      "renderedContent": 4377,
+      "renderedWords": 247,
+      "renderedCjk": 4194
+    },
+    {
+      "route": "/blogs/ja/pc_vs_mobile_speed_c8d4f2/",
+      "label": "日本語 — pc vs mobile speed c8d4f2",
+      "group": "Blog posts (ja)",
+      "renderedTotal": 4124,
+      "renderedContent": 4060,
+      "renderedWords": 243,
+      "renderedCjk": 3881
+    },
+    {
+      "route": "/blogs/ja/pixelify_privacy_first_a7f3d9/",
+      "label": "日本語 — pixelify privacy first a7f3d9",
+      "group": "Blog posts (ja)",
+      "renderedTotal": 4486,
+      "renderedContent": 4422,
+      "renderedWords": 220,
+      "renderedCjk": 4266
+    },
+    {
+      "route": "/blogs/ja/restore_old_photos_g3b8e5/",
+      "label": "日本語 — restore old photos g3b8e5",
+      "group": "Blog posts (ja)",
+      "renderedTotal": 4124,
+      "renderedContent": 4060,
+      "renderedWords": 226,
+      "renderedCjk": 3898
+    },
+    {
+      "route": "/blogs/ja/upscaler_advantages_e5a8d3/",
+      "label": "日本語 — upscaler advantages e5a8d3",
+      "group": "Blog posts (ja)",
+      "renderedTotal": 4351,
+      "renderedContent": 4287,
+      "renderedWords": 225,
+      "renderedCjk": 4126
+    },
+    {
+      "route": "/blogs/ja/upscaler_how_it_works_b7c3e1/",
+      "label": "日本語 — upscaler how it works b7c3e1",
+      "group": "Blog posts (ja)",
+      "renderedTotal": 4133,
+      "renderedContent": 4069,
+      "renderedWords": 213,
+      "renderedCjk": 3920
+    },
+    {
+      "route": "/blogs/ja/webgpu_vs_wasm_f4a7d6/",
+      "label": "日本語 — webgpu vs wasm f4a7d6",
+      "group": "Blog posts (ja)",
+      "renderedTotal": 3972,
+      "renderedContent": 3908,
+      "renderedWords": 251,
+      "renderedCjk": 3721
+    },
+    {
+      "route": "/blogs/hi/bg_remover_advantages_f9d2a6/",
+      "label": "हिन्दी — bg remover advantages f9d2a6",
+      "group": "Blog posts (hi)",
+      "renderedTotal": 1681,
+      "renderedContent": 1617,
+      "renderedWords": 1679,
+      "renderedCjk": 2
+    },
+    {
+      "route": "/blogs/hi/bg_remover_what_it_does_c4e8b2/",
+      "label": "हिन्दी — bg remover what it does c4e8b2",
+      "group": "Blog posts (hi)",
+      "renderedTotal": 1788,
+      "renderedContent": 1724,
+      "renderedWords": 1788,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/hi/data_harvesting_warning_a9e5b7/",
+      "label": "हिन्दी — data harvesting warning a9e5b7",
+      "group": "Blog posts (hi)",
+      "renderedTotal": 1694,
+      "renderedContent": 1630,
+      "renderedWords": 1690,
+      "renderedCjk": 4
+    },
+    {
+      "route": "/blogs/hi/enable_webgpu_guide_b5c9e8/",
+      "label": "हिन्दी — enable webgpu guide b5c9e8",
+      "group": "Blog posts (hi)",
+      "renderedTotal": 1736,
+      "renderedContent": 1672,
+      "renderedWords": 1730,
+      "renderedCjk": 6
+    },
+    {
+      "route": "/blogs/hi/local_ai_in_browser_d2f9c4/",
+      "label": "हिन्दी — local ai in browser d2f9c4",
+      "group": "Blog posts (hi)",
+      "renderedTotal": 1802,
+      "renderedContent": 1738,
+      "renderedWords": 1798,
+      "renderedCjk": 4
+    },
+    {
+      "route": "/blogs/hi/pc_vs_mobile_speed_c8d4f2/",
+      "label": "हिन्दी — pc vs mobile speed c8d4f2",
+      "group": "Blog posts (hi)",
+      "renderedTotal": 1688,
+      "renderedContent": 1624,
+      "renderedWords": 1682,
+      "renderedCjk": 6
+    },
+    {
+      "route": "/blogs/hi/pixelify_privacy_first_a7f3d9/",
+      "label": "हिन्दी — pixelify privacy first a7f3d9",
+      "group": "Blog posts (hi)",
+      "renderedTotal": 2036,
+      "renderedContent": 1972,
+      "renderedWords": 2036,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/hi/restore_old_photos_g3b8e5/",
+      "label": "हिन्दी — restore old photos g3b8e5",
+      "group": "Blog posts (hi)",
+      "renderedTotal": 1696,
+      "renderedContent": 1632,
+      "renderedWords": 1688,
+      "renderedCjk": 8
+    },
+    {
+      "route": "/blogs/hi/upscaler_advantages_e5a8d3/",
+      "label": "हिन्दी — upscaler advantages e5a8d3",
+      "group": "Blog posts (hi)",
+      "renderedTotal": 1779,
+      "renderedContent": 1715,
+      "renderedWords": 1773,
+      "renderedCjk": 6
+    },
+    {
+      "route": "/blogs/hi/upscaler_how_it_works_b7c3e1/",
+      "label": "हिन्दी — upscaler how it works b7c3e1",
+      "group": "Blog posts (hi)",
+      "renderedTotal": 1708,
+      "renderedContent": 1644,
+      "renderedWords": 1706,
+      "renderedCjk": 2
+    },
+    {
+      "route": "/blogs/hi/webgpu_vs_wasm_f4a7d6/",
+      "label": "हिन्दी — webgpu vs wasm f4a7d6",
+      "group": "Blog posts (hi)",
+      "renderedTotal": 1703,
+      "renderedContent": 1639,
+      "renderedWords": 1699,
+      "renderedCjk": 4
+    },
+    {
+      "route": "/blogs/ru/bg_remover_advantages_f9d2a6/",
+      "label": "Русский — bg remover advantages f9d2a6",
+      "group": "Blog posts (ru)",
+      "renderedTotal": 1328,
+      "renderedContent": 1264,
+      "renderedWords": 1328,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/ru/bg_remover_what_it_does_c4e8b2/",
+      "label": "Русский — bg remover what it does c4e8b2",
+      "group": "Blog posts (ru)",
+      "renderedTotal": 1364,
+      "renderedContent": 1300,
+      "renderedWords": 1364,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/ru/data_harvesting_warning_a9e5b7/",
+      "label": "Русский — data harvesting warning a9e5b7",
+      "group": "Blog posts (ru)",
+      "renderedTotal": 1378,
+      "renderedContent": 1314,
+      "renderedWords": 1378,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/ru/enable_webgpu_guide_b5c9e8/",
+      "label": "Русский — enable webgpu guide b5c9e8",
+      "group": "Blog posts (ru)",
+      "renderedTotal": 1382,
+      "renderedContent": 1318,
+      "renderedWords": 1382,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/ru/local_ai_in_browser_d2f9c4/",
+      "label": "Русский — local ai in browser d2f9c4",
+      "group": "Blog posts (ru)",
+      "renderedTotal": 1408,
+      "renderedContent": 1344,
+      "renderedWords": 1408,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/ru/pc_vs_mobile_speed_c8d4f2/",
+      "label": "Русский — pc vs mobile speed c8d4f2",
+      "group": "Blog posts (ru)",
+      "renderedTotal": 1356,
+      "renderedContent": 1292,
+      "renderedWords": 1356,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/ru/pixelify_privacy_first_a7f3d9/",
+      "label": "Русский — pixelify privacy first a7f3d9",
+      "group": "Blog posts (ru)",
+      "renderedTotal": 1638,
+      "renderedContent": 1574,
+      "renderedWords": 1638,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/ru/restore_old_photos_g3b8e5/",
+      "label": "Русский — restore old photos g3b8e5",
+      "group": "Blog posts (ru)",
+      "renderedTotal": 1351,
+      "renderedContent": 1287,
+      "renderedWords": 1351,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/ru/upscaler_advantages_e5a8d3/",
+      "label": "Русский — upscaler advantages e5a8d3",
+      "group": "Blog posts (ru)",
+      "renderedTotal": 1364,
+      "renderedContent": 1300,
+      "renderedWords": 1364,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/ru/upscaler_how_it_works_b7c3e1/",
+      "label": "Русский — upscaler how it works b7c3e1",
+      "group": "Blog posts (ru)",
+      "renderedTotal": 1306,
+      "renderedContent": 1242,
+      "renderedWords": 1306,
+      "renderedCjk": 0
+    },
+    {
+      "route": "/blogs/ru/webgpu_vs_wasm_f4a7d6/",
+      "label": "Русский — webgpu vs wasm f4a7d6",
+      "group": "Blog posts (ru)",
+      "renderedTotal": 1340,
+      "renderedContent": 1276,
+      "renderedWords": 1340,
+      "renderedCjk": 0
+    }
+  ]
+}

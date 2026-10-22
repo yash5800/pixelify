@@ -3,18 +3,34 @@
   "version": "1.0.0",
   "description": "AI Photo Editor | BGRemover/Upscaler",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/dev-server.mjs",
+    "dev:site": "next dev",
     "build": "next build",
+    "build:safe": "NEXT_DIST_DIR=.next-build next build && rm -rf out && mv .next-build out",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postinstall": "node -e \"import('./scripts/prune-onnx-binaries.mjs').catch(e=>{console.warn('[prune-onnx] skipped:', e.code==='ERR_MODULE_NOT_FOUND'?'script not present':e.message)})\"",
+    "chopper:serve": "node scripts/chopper-serve.mjs",
+    "preview:cloud": "npm run build && node scripts/chopper-serve.mjs --port 8787 --static out",
+    "chopper:parity": "node scripts/chopper-parity.mjs",
+    "chopper:bench": "node scripts/chopper-bench.mjs",
+    "words": "node scripts/word-count.mjs",
+    "words:render": "node scripts/render-word-count.mjs",
+    "words:report": "node scripts/build-report.mjs",
+    "serve:export": "python3 -m http.server 4321 --bind 127.0.0.1 --directory out"
   },
   "devDependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "@types/node": "26.6.5",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "autoprefixer": "^10.5.4",
     "postcss": "^8.5.20",
+    "sharp": "^0.34.5",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.9.3"
   },
@@ -26,6 +42,7 @@
     "gsap": "^3.15.0",
     "lucide-react": "^1.27.0",
     "next": "^14.2.33",
+    "onnxruntime-node": "1.19.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "thinking-orbs": "^0.3.1",
