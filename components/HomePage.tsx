@@ -12,6 +12,8 @@ import WhyChoosePixelify from './WhyChoosePixelify';
 import HomeFaq from './HomeFaq';
 import Testimonials from "./TestimonialsSection";
 import HomeDemo from './HomeDemo';
+import HomeWorkflowDemos from './HomeWorkflowDemos';
+import '@/styles/workflow-demos.css';
 import '@/styles/home.css';
 interface HomePageProps {
   onLaunchUpscaler: () => void;
@@ -36,6 +38,10 @@ export default function HomePage({
         onLaunchUpscaler={onLaunchUpscaler}
         onLaunchBGRemove={onLaunchBGRemove}
       />
+
+      <div className="mx-auto w-full max-w-7xl px-3 sm:px-6 relative z-10">
+        <HomeWorkflowDemos onLaunchUpscaler={onLaunchUpscaler} onLaunchBGRemove={onLaunchBGRemove} />
+      </div>
 
       <div id="home-content" className="flex flex-col gap-10 sm:gap-16 pt-6 sm:pt-12 pb-12 max-w-7xl mx-auto px-3 sm:px-6 relative z-10">
 
