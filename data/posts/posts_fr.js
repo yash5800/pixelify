@@ -7,7 +7,7 @@ export const POSTS_FR = [
   // ---- pixelify_privacy_first_a7f3d9 ----
   {
     slug: 'pixelify_privacy_first_a7f3d9',
-    title: 'Pixelify : Pourquoi nous avons créé un éditeur d\'images qui ne voit jamais vos photos',
+    title: 'Éditeur d\'images privé sans téléversement : pourquoi Pixelify ne voit jamais vos photos',
     description:
       'Tous les autres outils d\'image exigent d\'abord votre envoi et promettent la confidentialité plus tard. Pixelify a été conçu à l\'opposé : l\'IA s\'exécute dans l\'onglet de votre navigateur, de sorte que vos photos ne quittent jamais votre appareil.',
     tags: ['Confidentialité', 'IA Locale', 'Produit'],
@@ -103,7 +103,7 @@ export const POSTS_FR = [
   // ---- enable_webgpu_guide_b5c9e8 ----
   {
     slug: 'enable_webgpu_guide_b5c9e8',
-    title: 'Activer WebGPU : Le changement de deux minutes qui accélère considérablement l\'IA dans le navigateur',
+    title: 'Comment activer WebGPU dans Chrome, Firefox et Safari (guide de 2 minutes)',
     description:
       'WebGPU permet à l\'IA basée sur navigateur de s\'exécuter sur votre puce graphique plutôt que sur votre CPU, souvent 5 à 10 fois plus vite. Un guide navigateur par navigateur pour l\'activer, plus comment confirmer son fonctionnement via le badge du moteur dans les paramètres.',
     tags: ['WebGPU', 'Guide', 'Performance'],
@@ -192,7 +192,7 @@ export const POSTS_FR = [
   // ---- data_harvesting_warning_a9e5b7 ----
   {
     slug: 'data_harvesting_warning_a9e5b7',
-    title: 'Ce qui arrive à vos photos après avoir cliqué sur « Téléverser »',
+    title: 'Que devient votre photo après un téléversement ? Les outils IA gratuits expliqués',
     description:
       'Les outils d\'image gratuits monétisent les téléversements de manières que la plupart des utilisateurs ne voient jamais : clauses de conservation, données dérivées, entraînement de modèles, exposition aux fuites. Un guide pratique pour lire les petites lignes et éliminer ce risque de votre vie.',
     tags: ['Confidentialité', 'Sécurité', 'Industrie'],
@@ -276,7 +276,7 @@ export const POSTS_FR = [
   // ---- pc_vs_mobile_speed_c8d4f2 ----
   {
     slug: 'pc_vs_mobile_speed_c8d4f2',
-    title: 'Téléphone ou PC : Où l\'IA sur appareil s\'exécute-t-elle le plus vite ?',
+    title: 'Téléphone ou PC : quel appareil est le plus rapide pour l\'IA sur appareil ?',
     description:
       'Les GPU de bureau, les puces d\'ordinateurs portables et les SoC de smartphones exécutent tous des réseaux neuronaux désormais, mais pas de façon égale. Ce qui détermine réellement la vitesse, pourquoi les téléphones gagnent parfois, et comment obtenir le résultat le plus rapide depuis le matériel que vous possédez.',
     tags: ['Performance', 'WebGPU', 'Guide'],
@@ -360,7 +360,7 @@ export const POSTS_FR = [
   // ---- bg_remover_advantages_f9d2a6 ----
   {
     slug: 'bg_remover_advantages_f9d2a6',
-    title: 'Sept gains pratiques grâce au détourage d\'arrière-plan en un clic',
+    title: 'Supprimer l\'arrière-plan d\'une photo : 7 usages concrets (produit, vignettes, CV)',
     description:
       'Fiches e-commerce, vignettes, photos de CV, thèmes visuels, création pour l\'impression : un guide de terrain sur ce que le détourage instantané débloque, et pourquoi son exécution sur votre propre appareil en multiplie la valeur.',
     tags: ['Détourage d\'arrière-plan', 'Cas d\'usage', 'Flux de travail'],
@@ -441,7 +441,7 @@ export const POSTS_FR = [
   // ---- upscaler_advantages_e5a8d3 ----
   {
     slug: 'upscaler_advantages_e5a8d3',
-    title: 'Ce que débloque l\'agrandissement par IA : Sept flux de travail réels transformés',
+    title: 'Comment agrandir une image sans perdre en qualité : 7 cas d\'usage réels',
     description:
       'Du sauvetage de numérisations familiales vieux de dix ans aux affiches prêtes à imprimer et aux captures d\'écran nettes : des cas d\'usage pratiques où l\'agrandissement par IA prouve sa valeur, et pourquoi la vitesse sur appareil rend l\'itération totalement gratuite.',
     tags: ['Agrandisseur', 'Cas d\'usage', 'Flux de travail'],
@@ -535,7 +535,7 @@ export const POSTS_FR = [
   // ---- local_ai_in_browser_d2f9c4 ----
   {
     slug: 'local_ai_in_browser_d2f9c4',
-    title: 'Comment l\'IA s\'exécute réellement dans l\'onglet de votre navigateur, et les solutions qu\'il a fallu concevoir',
+    title: 'Comment l\'IA fonctionne dans votre navigateur : sans serveur, sans téléversement',
     description:
       'Les navigateurs ont été conçus pour afficher des documents, pas pour exécuter des réseaux neuronaux. Un coup d\'œil sous le capot du calcul GPU, des workers, du découpage en tuiles, du cache et des compromis d\'ingénierie qui rendent l\'IA sur appareil fluide et naturelle.',
     tags: ['Ingénierie', 'IA Locale', 'WebGPU'],
@@ -623,7 +623,7 @@ export const POSTS_FR = [
   // ---- upscaler_how_it_works_b7c3e1 ----
   {
     slug: 'upscaler_how_it_works_b7c3e1',
-    title: 'Agrandissement par IA : Pourquoi votre image devient plus nette au lieu d\'être simplement plus grande',
+    title: 'Comment fonctionne l\'agrandissement d\'image par IA ? L\'hyperrésolution expliquée',
     description:
       'L\'agrandissement traditionnel interpole les pixels et crée du flou. La super-résolution par IA reconstruit les détails. Voici ce que cela signifie, pourquoi cela fonctionne et ce qui se passe réellement entre votre fichier source et le résultat.',
     tags: ['Agrandisseur', 'Fonctionnalités', 'IA Locale'],
@@ -706,7 +706,7 @@ export const POSTS_FR = [
   // ---- restore_old_photos_g3b8e5 ----
   {
     slug: 'restore_old_photos_g3b8e5',
-    title: 'Restauration de photos anciennes avec l\'IA sur appareil : Un guide pratique',
+    title: 'Restaurer une photo ancienne avec l\'IA, gratuitement et sans filigrane',
     description:
       'Les photos de famille numérisées sont généralement trop petites, trop douces et trop privées pour être envoyées vers un service cloud. Un flux de travail étape par étape pour sauver des images d\'archives, couvrant les réglages de numérisation, la stratégie d\'agrandissement et les vérifications qui repèrent les dérives de reconstruction.',
     tags: ['Agrandisseur', 'Guide', 'Confidentialité'],
@@ -798,7 +798,7 @@ export const POSTS_FR = [
   // ---- bg_remover_what_it_does_c4e8b2 ----
   {
     slug: 'bg_remover_what_it_does_c4e8b2',
-    title: 'Le détourage d\'arrière-plan expliqué : Ce qui se passe réellement quand vous cliquez sur « Supprimer »',
+    title: 'Comment fonctionne un détourage d\'arrière-plan ? Ce qui se passe au clic',
     description:
       'Un aperçu accessible du détourage automatique d\'arrière-plan : ce que la technologie fait avec les pixels, pourquoi les cas complexes comme les cheveux et les pelages étaient autrefois difficiles, et ce que change le traitement sur appareil.',
     tags: ['Détourage d\'arrière-plan', 'Fonctionnalités', 'IA Locale'],
@@ -893,7 +893,7 @@ export const POSTS_FR = [
   // ---- webgpu_vs_wasm_f4a7d6 ----
   {
     slug: 'webgpu_vs_wasm_f4a7d6',
-    title: 'Deux moteurs, un seul résultat : Ce que signifie réellement le badge WebGPU et CPU',
+    title: 'WebGPU vs WASM : quel est le plus rapide pour l\'IA dans le navigateur ?',
     description:
       'Chaque outil d\'IA locale s\'exécute soit sur votre GPU, soit sur votre CPU. Les deux produisent la même qualité, mais le temps d\'attente varie considérablement. Ce qu\'est chaque moteur, pourquoi le recours au CPU existe, et comment lire le badge avec précision.',
     tags: ['WebGPU', 'Ingénierie', 'Performance'],

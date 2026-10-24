@@ -9,7 +9,7 @@ export const POSTS_ZH = [
   // ---- pixelify_privacy_first_a7f3d9 ----
   {
     slug: 'pixelify_privacy_first_a7f3d9',
-    title: 'Pixelify：为什么我们要构建一款永远看不到你照片的图像编辑器',
+    title: '无需上传的隐私图片编辑器：Pixelify 为什么看不到你的照片',
     description:
       '其他所有图像工具都要求你先上传，再承诺隐私。Pixelify 的设计理念则完全相反：AI 在你的浏览器标签页本地运行，因此你的照片永远不会离开你的设备。',
     tags: ['隐私', '本地AI', '产品'],
@@ -105,7 +105,7 @@ export const POSTS_ZH = [
   // ---- enable_webgpu_guide_b5c9e8 ----
   {
     slug: 'enable_webgpu_guide_b5c9e8',
-    title: '启用 WebGPU：让浏览器 AI 运行速度大幅提升的两分钟小改变',
+    title: '如何在 Chrome、Firefox、Safari 中启用 WebGPU（两分钟指南）',
     description:
       'WebGPU 允许基于浏览器的 AI 在你的图形芯片而非 CPU 上运行，速度通常可提升 5 到 10 倍。本文提供各浏览器的开启指南，以及如何在设置中通过引擎徽章确认其已生效。',
     tags: ['WebGPU', '指南', '性能'],
@@ -193,7 +193,7 @@ export const POSTS_ZH = [
   // ---- data_harvesting_warning_a9e5b7 ----
   {
     slug: 'data_harvesting_warning_a9e5b7',
-    title: '当你点击“上传”后，你的照片都经历了什么',
+    title: '照片上传到免费 AI 工具后都经历了什么：隐私风险解析',
     description:
       '免费图像工具以大多数用户从未见过的方式将上传内容变现：保留条款、衍生数据、模型训练、泄露风险。这是一份关于阅读小字条款并将其从生活中剔除的实用指南。',
     tags: ['隐私', '安全', '行业'],
@@ -278,7 +278,7 @@ export const POSTS_ZH = [
   // ---- pc_vs_mobile_speed_c8d4f2 ----
   {
     slug: 'pc_vs_mobile_speed_c8d4f2',
-    title: '手机还是 PC：端侧 AI 到底在哪里运行得更快',
+    title: '手机还是 PC：端侧 AI 图像处理哪个更快？',
     description:
       '桌面端 GPU、笔记本芯片和手机 SoC 现在都能运行神经网络，尽管性能并非完全对等。究竟是什么决定了速度，为什么手机有时会获胜，以及如何从你拥有的硬件中榨取最快的运行结果。',
     tags: ['性能', 'WebGPU', '指南'],
@@ -362,7 +362,7 @@ export const POSTS_ZH = [
   // ---- bg_remover_advantages_f9d2a6 ----
   {
     slug: 'bg_remover_advantages_f9d2a6',
-    title: '一键去除背景带来的七个实用优势',
+    title: '背景去除的 7 种用法：商品图、头像、简历照片',
     description:
       '电商产品图、缩略图、证件照、表情包、印刷设计：一份带你领略即时抠图解锁哪些场景，以及在自己的设备上运行它们如何成倍放大价值的实地指南。',
     tags: ['背景去除器', '使用场景', '工作流'],
@@ -443,7 +443,7 @@ export const POSTS_ZH = [
   // ---- upscaler_advantages_e5a8d3 ----
   {
     slug: 'upscaler_advantages_e5a8d3',
-    title: 'AI 图像放大解锁了什么：七个被重塑的实际工作流',
+    title: 'AI 图像放大使用场景：从老照片扫描到印刷的 7 个工作流',
     description:
       '从拯救数十年前的家庭扫描件到打印级海报和清晰的截图：AI 图像放大证明其价值的实际用例，以及为什么端设备上的速度让迭代成本归零。',
     tags: ['图像放大', '使用场景', '工作流'],
@@ -536,7 +536,7 @@ export const POSTS_ZH = [
   // ---- local_ai_in_browser_d2f9c4 ----
   {
     slug: 'local_ai_in_browser_d2f9c4',
-    title: 'AI 实际上是如何在你的浏览器标签页中运行的，以及它所经历的种种变通方案',
+    title: 'AI 如何在浏览器里本地运行：无需上传、无需服务器',
     description:
       '浏览器生来是为了展示文档，而不是运行神经网络。深入底层探究 GPU 计算、工作线程（workers）、分块（tiling）、缓存，以及让端侧 AI 感觉毫不费力的工程妥协。',
     tags: ['工程学', '本地AI', 'WebGPU'],
@@ -624,7 +624,7 @@ export const POSTS_ZH = [
   // ---- upscaler_how_it_works_b7c3e1 ----
   {
     slug: 'upscaler_how_it_works_b7c3e1',
-    title: 'AI 图像放大：为什么你的图像变得更清晰，而不仅仅是更大',
+    title: 'AI 图像放大是如何工作的？超分辨率原理解析',
     description:
       '传统的放大通过插值像素导致模糊。AI 超分辨率则能重建细节。这意味着什么，为什么它能起作用，以及在你的输入与结果之间到底发生了什么。',
     tags: ['图像放大', '功能', '本地AI'],
@@ -707,7 +707,7 @@ export const POSTS_ZH = [
   // ---- restore_old_photos_g3b8e5 ----
   {
     slug: 'restore_old_photos_g3b8e5',
-    title: '使用端侧 AI 恢复老照片：一份实用指南',
+    title: '如何用 AI 免费修复老照片：无水印、不上传、本地处理',
     description:
       '扫描的家庭照片通常太小、太模糊、也太私密，不适合扔给云服务。这是一份拯救归档图像的分步工作流，涵盖扫描设置、放大策略以及捕获重建漂移的检查方法。',
     tags: ['图像放大', '指南', '隐私'],
@@ -798,7 +798,7 @@ export const POSTS_ZH = [
   // ---- bg_remover_what_it_does_c4e8b2 ----
   {
     slug: 'bg_remover_what_it_does_c4e8b2',
-    title: '背景去除器解析：当你点击“移除”时究竟发生了什么',
+    title: '背景去除器是如何工作的？点击“移除”时发生了什么',
     description:
       '用通俗易懂的英语了解自动背景去除：这项技术对像素做了什么，为什么头发和毛皮等边缘情况曾经很难处理，以及端侧处理改变了什么。',
     tags: ['背景去除器', '功能', '本地AI'],
@@ -893,7 +893,7 @@ export const POSTS_ZH = [
   // ---- webgpu_vs_wasm_f4a7d6 ----
   {
     slug: 'webgpu_vs_wasm_f4a7d6',
-    title: '两个引擎，一个结果：WebGPU 与 CPU 回退徽章的真正含义',
+    title: 'WebGPU 和 WASM 哪个更快？浏览器 AI 引擎对比',
     description:
       '每个本地 AI 工具都运行在你的 GPU 或 CPU 上。两者产生相同的质量，但等待时间截然不同。每个引擎是什么，为什么存在回退，以及如何诚实地解读徽章。',
     tags: ['WebGPU', '工程学', '性能'],

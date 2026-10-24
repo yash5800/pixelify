@@ -9,7 +9,7 @@ export const POSTS_EN = [
   // ---- pixelify_privacy_first_a7f3d9 ----
   {
     slug: 'pixelify_privacy_first_a7f3d9',
-    title: 'Pixelify: Why We Built an Image Editor That Never Sees Your Photos',
+    title: 'Private Photo Editor With No Upload: Why Pixelify Never Sees Your Photos',
     description:
       'Every other image tool wants your upload first and promises privacy later. Pixelify was designed the opposite way: the AI runs inside your browser tab, so your photos never leave the device in the first place.',
     tags: ['Privacy', 'Local AI', 'Product'],
@@ -105,7 +105,7 @@ export const POSTS_EN = [
   // ---- enable_webgpu_guide_b5c9e8 ----
   {
     slug: 'enable_webgpu_guide_b5c9e8',
-    title: 'Enable WebGPU: The Two-Minute Change That Makes Browser AI Much Faster',
+    title: 'How to Enable WebGPU in Chrome, Firefox, Safari and Edge (2-Minute Guide)',
     description:
       'WebGPU lets browser-based AI run on your graphics chip instead of your CPU, often 5–10× faster. A browser-by-browser guide to turning it on, plus how to confirm it worked using the engine badge in settings.',
     tags: ['WebGPU', 'Guide', 'Performance'],
@@ -194,7 +194,7 @@ export const POSTS_EN = [
   // ---- data_harvesting_warning_a9e5b7 ----
   {
     slug: 'data_harvesting_warning_a9e5b7',
-    title: 'What Happens to Your Photos After You Hit "Upload"',
+    title: 'What Happens to Your Photos After You Upload Them to Free AI Tools',
     description:
       'Free image tools monetize uploads in ways most users never see: retention clauses, derived data, model training, breach exposure. A practical guide to reading the fine print and designing it out of your life.',
     tags: ['Privacy', 'Security', 'Industry'],
@@ -278,7 +278,7 @@ export const POSTS_EN = [
   // ---- pc_vs_mobile_speed_c8d4f2 ----
   {
     slug: 'pc_vs_mobile_speed_c8d4f2',
-    title: 'Phone or PC: Where On-Device AI Actually Runs Faster',
+    title: 'Phone vs PC: Which Is Faster for On-Device AI Photo Editing?',
     description:
       'Desktop GPUs, laptop chips, and phone SoCs all run neural networks now, though not equally. What actually determines speed, why phones sometimes win, and how to get the fastest result from the hardware you own.',
     tags: ['Performance', 'WebGPU', 'Guide'],
@@ -362,7 +362,7 @@ export const POSTS_EN = [
   // ---- bg_remover_advantages_f9d2a6 ----
   {
     slug: 'bg_remover_advantages_f9d2a6',
-    title: 'Seven Practical Wins From One-Click Background Removal',
+    title: '7 Background Removal Use Cases: Product Photos, Thumbnails, Resumes',
     description:
       'E-commerce listings, thumbnails, resume photos, memes, print design: a field guide to what instant cutouts unlock, and why running them on your own device multiplies the value.',
     tags: ['Background Remover', 'Use Cases', 'Workflow'],
@@ -443,7 +443,7 @@ export const POSTS_EN = [
   // ---- upscaler_advantages_e5a8d3 ----
   {
     slug: 'upscaler_advantages_e5a8d3',
-    title: 'What AI Upscaling Unlocks: Seven Real Workflows Transformed',
+    title: 'AI Upscaling Use Cases: 7 Real Workflows, From Old Scans to Print',
     description:
       'From rescuing decade-old family scans to print-ready posters and crisp screenshots: practical use cases where AI upscaling earns its place, and why on-device speed makes iteration free.',
     tags: ['Upscaler', 'Use Cases', 'Workflow'],
@@ -537,7 +537,7 @@ export const POSTS_EN = [
   // ---- local_ai_in_browser_d2f9c4 ----
   {
     slug: 'local_ai_in_browser_d2f9c4',
-    title: 'How AI Actually Runs Inside Your Browser Tab, and the Workarounds It Took',
+    title: 'How AI Runs in Your Browser: Local Models, No Upload, No Server',
     description:
       'Browsers were built to display documents, not run neural networks. A look under the hood at GPU compute, workers, tiling, caching, and the engineering compromises that make on-device AI feel effortless.',
     tags: ['Engineering', 'Local AI', 'WebGPU'],
@@ -625,7 +625,7 @@ export const POSTS_EN = [
   // ---- upscaler_how_it_works_b7c3e1 ----
   {
     slug: 'upscaler_how_it_works_b7c3e1',
-    title: 'AI Upscaling: Why Your Image Gets Sharper Instead of Just Bigger',
+    title: 'How Does AI Image Upscaling Work? Super-Resolution, Explained',
     description:
       'Traditional enlargement interpolates pixels and blurs. AI super-resolution reconstructs detail. Here is what that means, why it works, and what actually happens between your input and the result.',
     tags: ['Upscaler', 'Features', 'Local AI'],
@@ -708,7 +708,7 @@ export const POSTS_EN = [
   // ---- restore_old_photos_g3b8e5 ----
   {
     slug: 'restore_old_photos_g3b8e5',
-    title: 'Restoring Old Photos With On-Device AI: A Practical Guide',
+    title: 'How to Restore Old Photos With AI for Free (No Watermark, No Upload)',
     description:
       'Scanned family photos are usually too small, too soft, and too private to throw at a cloud service. A step-by-step workflow for rescuing archival images, covering scan settings, upscale strategy, and the checks that catch reconstruction drift.',
     tags: ['Upscaler', 'Guide', 'Privacy'],
@@ -800,7 +800,7 @@ export const POSTS_EN = [
   // ---- bg_remover_what_it_does_c4e8b2 ----
   {
     slug: 'bg_remover_what_it_does_c4e8b2',
-    title: 'Background Remover Explained: What Actually Happens When You Click "Remove"',
+    title: 'How Does a Background Remover Work? What Happens When You Click Remove',
     description:
       'A plain-English look at automatic background removal: what the technology does with pixels, why edge cases like hair and fur used to be hard, and what on-device processing changes.',
     tags: ['Background Remover', 'Features', 'Local AI'],
@@ -895,7 +895,7 @@ export const POSTS_EN = [
   // ---- webgpu_vs_wasm_f4a7d6 ----
   {
     slug: 'webgpu_vs_wasm_f4a7d6',
-    title: 'Two Engines, One Result: What the WebGPU and CPU Fallback Badge Really Means',
+    title: 'WebGPU vs WASM: Which Is Faster for Running AI in Your Browser?',
     description:
       'Every local AI tool runs on either your GPU or your CPU. Both produce the same quality, but the wait differs dramatically. What each engine is, why the fallback exists, and how to read the badge honestly.',
     tags: ['WebGPU', 'Engineering', 'Performance'],
