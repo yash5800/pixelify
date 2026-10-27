@@ -2,10 +2,11 @@ import React from "react";
 
 interface LogoProps {
     className?: string;
-    size?: "sm" | "md" | "lg" | "xl";
+    size?: "xs" | "sm" | "md" | "lg" | "xl";
 }
 
 const SIZE = {
+    xs: "text-[1.35rem]",
     sm: "text-[2.4rem]",
     md: "text-[4rem]",
     lg: "text-[6rem]",
@@ -64,6 +65,7 @@ export default function Logo({
             <style dangerouslySetInnerHTML={{ __html: `
         .pixelify-logo {
           font-family: "Minecrafter", monospace;
+          white-space: nowrap;
         }
           
         .pixelify-letter {
@@ -173,6 +175,8 @@ export default function Logo({
             <div
                 className={`
           pixelify-logo
+          whitespace-nowrap
+          select-none
           ${SIZE[size]}
           ${className}
         `}

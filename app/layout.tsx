@@ -17,7 +17,7 @@ const SITE_URL = 'https://pixelify.me';
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: 'Pixelify | Free On-Device AI Photo Editor | Image Upscaler & Background Remover',
-  description: 'Pixelify runs AI image upscaling and background removal entirely in your browser. Private, on-device, no uploads, no tracking. Free 4× super-resolution.',
+  description: 'Pixelify runs AI image upscaling and background removal entirely in your browser. Private, on-device, no image uploads, no cross-site tracking. Free 4× super-resolution.',
   keywords: [
     'AI image upscaler',
     'photo enhancer',

@@ -88,16 +88,10 @@ export default function TestimonialsSection() {
   };
 
   return (
-    <section className="pixelify-testimonials-wrap w-screen max-w-[100vw] relative left-1/2 -translate-x-1/2 overflow-hidden my-4 sm:my-8">
+    <section className="pixelify-testimonials-wrap w-full overflow-hidden my-4 sm:my-8">
       <div className="pixelify-testimonials-panel w-full overflow-hidden rounded-[28px] sm:rounded-[44px] bg-white px-5 py-8 sm:px-8 sm:py-10 lg:px-12 lg:py-12 shadow-[0_30px_100px_rgba(0,0,0,0.7)]">
         <div className="mx-auto flex max-w-7xl flex-col gap-7 sm:flex-row sm:items-end sm:justify-between">
-          <motion.div
-            className="max-w-2xl"
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.3 }}
-            transition={{ duration: 0.5 }}
-          >
+          <div className="max-w-2xl">
             <span className="pixelify-testimonial-eyebrow">THE WORD IS OUT</span>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-neutral-950 leading-[1.12]">
               Loved by digital artists,{' '}
@@ -108,11 +102,11 @@ export default function TestimonialsSection() {
             <p className="text-sm sm:text-base text-neutral-600 leading-relaxed mt-2">
               Real creators sharing why they ditched cloud subscription models for fast, private in-browser neural processing.
             </p>
-          </motion.div>
+          </div>
         </div>
 
         {/* ========================================================================= */}
-        {/* CAROUSEL VIEWPORT WITH FADED CARD ARROW OVERLAYS                          */}
+        {/* CAROUSEL VIEWPORT WITH NAVIGATION CONTROLS                                */}
         {/* ========================================================================= */}
         <div className="pixelify-testimonial-viewport relative mx-auto mt-9 max-w-7xl sm:mt-12">
           {/* POPPING LEFT ARROW (Appears after going to the right) */}
@@ -133,7 +127,7 @@ export default function TestimonialsSection() {
             )}
           </AnimatePresence>
 
-          {/* LEFT GRADIENT FADE (Reveals when scrolled right) */}
+          {/* LEFT WHITE FADE */}
           <AnimatePresence>
             {canGoBack && (
               <motion.div
@@ -141,7 +135,7 @@ export default function TestimonialsSection() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.25 }}
-                className="pointer-events-none absolute left-0 top-0 bottom-0 w-16 sm:w-28 lg:w-36 z-20 bg-gradient-to-r from-white via-white/80 to-transparent"
+                className="pointer-events-none absolute bottom-0 left-0 top-0 z-20 w-16 bg-gradient-to-r from-white via-white/80 to-transparent sm:w-28 lg:w-36"
                 aria-hidden="true"
               />
             )}
@@ -155,14 +149,10 @@ export default function TestimonialsSection() {
             aria-label="Customer testimonials"
           >
             {testimonials.map((item, index) => (
-              <motion.article
+              <article
                 key={`${item.initials}-${index}`}
                 data-testimonial-card
                 className="pixelify-testimonial-card flex shrink-0 flex-col"
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.15 }}
-                transition={{ duration: 0.4, delay: Math.min(index * 0.05, 0.2) }}
               >
                 <div className="flex items-center justify-between">
                   <span className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs text-white bg-gradient-to-br shadow-sm shrink-0 ${item.tone}`} aria-hidden="true">
@@ -178,11 +168,11 @@ export default function TestimonialsSection() {
                     <span className="rounded-full bg-neutral-100 px-2.5 py-1">{item.context}</span>
                   </div>
                 </div>
-              </motion.article>
+              </article>
             ))}
           </div>
 
-          {/* RIGHT GRADIENT FADE (Overlays 4th card with smooth gradient) */}
+          {/* RIGHT WHITE FADE */}
           <AnimatePresence>
             {canGoForward && (
               <motion.div
@@ -190,13 +180,13 @@ export default function TestimonialsSection() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.25 }}
-                className="pointer-events-none absolute right-0 top-0 bottom-0 w-24 sm:w-40 lg:w-52 z-20 bg-gradient-to-l from-white via-white/85 to-transparent"
+                className="pointer-events-none absolute bottom-0 right-0 top-0 z-20 w-24 bg-gradient-to-l from-white via-white/85 to-transparent sm:w-40 lg:w-52"
                 aria-hidden="true"
               />
             )}
           </AnimatePresence>
 
-          {/* RIGHT ARROW (Positioned directly over the faded card, hover bg black & text white) */}
+          {/* RIGHT ARROW */}
           <AnimatePresence>
             {canGoForward && (
               <motion.button

@@ -21,11 +21,9 @@ export default function BgRemoveView() {
   } = useApp();
 
   return (
-    <div className="w-full flex flex-col gap-8">
-      <div>
-       <DeviceRecommendationNotice tool="upscale" />
-      </div>
-      
+    <div className="flex flex-col gap-8 w-full px-2">
+      <DeviceRecommendationNotice tool="bg_remove" />
+
       <BGRemoveWorkspace
         jobs={bgJobs}
         setJobs={setBgJobs}

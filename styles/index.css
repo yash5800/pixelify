@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Bungee&family=Caveat:wght@600;700&family=Cinzel:wght@700;900&family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=DM+Serif+Display:ital@0;1&family=Dancing+Script:wght@600;700&family=Fira+Code:wght@500;700&family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700&family=Lexend:wght@400;600;700&family=Merriweather:ital,wght@0,700;1,700&family=Montserrat:wght@400;600;700;800;900&family=Orbitron:wght@700;900&family=Outfit:wght@400;500;600;700;800;900&family=Pacifico&family=Playfair+Display:ital,wght@0,600;0,700;0,900;1,600;1,700&family=Plus+Jakarta+Sans:ital,wght@0,400;0,600;0,700;0,800;1,400;1,700&family=Poppins:wght@400;600;700;800;900&family=Righteous&family=Russo+One&family=Satisfy&family=Space+Grotesk:wght@500;700&family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -1767,10 +1767,7 @@ html.light .gradient-text {
 
     gap: 14px;
 
-    padding-top:
-      calc(
-        var(--bgremove-toolbar-height) + 10px
-      );
+    padding-top: 0;
   }
 
   .bgremove-canvas-column {

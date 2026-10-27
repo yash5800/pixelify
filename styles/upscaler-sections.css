@@ -349,7 +349,7 @@
 .uc-faq-item:first-child { border-top: 1px solid var(--uc-line); }
 .uc-faq-q {
   display: grid;
-  grid-template-columns: 44px 1fr 36px;
+  grid-template-columns: 1fr 36px;
   align-items: center;
   gap: 14px;
   width: 100%;
@@ -359,17 +359,6 @@
   cursor: pointer;
   text-align: left;
   color: var(--uc-white);
-}
-.uc-faq-num {
-  font-size: 10.5px;
-  font-weight: 800;
-  letter-spacing: 0.22em;
-  color: var(--uc-gray-2);
-  transition: color 0.3s ease;
-}
-.uc-faq-item.is-open .uc-faq-num,
-.uc-faq-q:hover .uc-faq-num {
-  color: var(--uc-green);
 }
 .uc-faq-qtext {
   font-size: clamp(18px, 2.1vw, 25px);
@@ -524,9 +513,9 @@
   font-weight: 800;
   letter-spacing: 0.14em;
   backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   pointer-events: none;
   z-index: 3;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
 }
 .uc-tag-before {
   left: 12px;
@@ -534,12 +523,23 @@
   background: rgba(5, 5, 7, 0.62);
   border: 1px solid rgba(255, 255, 255, 0.16);
 }
+.uc-tag-before.is-active {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.65);
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.35);
+  transform: scale(1.06);
+}
 .uc-tag-after {
   right: 12px;
   color: #04110a;
   background: var(--uc-green);
   border: 1px solid rgba(255, 255, 255, 0.35);
   box-shadow: 0 0 22px rgba(0, 255, 133, 0.45);
+}
+.uc-tag-after.is-active {
+  box-shadow: 0 0 32px rgba(0, 255, 133, 0.85);
+  transform: scale(1.06);
 }
 
 /* --- stat pills --- */

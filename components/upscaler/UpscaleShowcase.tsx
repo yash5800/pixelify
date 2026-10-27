@@ -113,56 +113,186 @@ function useReveal<T extends HTMLElement>() {
    INTERACTIVE BEFORE / AFTER LENS
    · Pointer-capture dragging (mouse + touch, can't get stuck)
    · Full 0–100 range
-   · Auto-sweeps back & forth until the user grabs it,
-     then resumes a few seconds after they let go
+   · Automated Choreography:
+     Middle (50%) -> Right (100%) -> Hold -> Left (0%) -> Hold -> Middle (50%) -> Hold -> Next Image!
+   · User can grab and drag anytime; auto-rotation resumes smoothly 3s after release
    ============================================================ */
-const CompareLens: React.FC<{ pair: ShowcasePair }> = ({ pair }) => {
+const CompareLens: React.FC<{
+  pair: ShowcasePair;
+  onNext: () => void;
+}> = ({ pair, onNext }) => {
   const [pos, setPos] = useState(50);
-  const [auto, setAuto] = useState(true);
+  const posRef = useRef(50);
   const frameRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef(false);
-  const dirRef = useRef<1 | -1>(1);
+  const isManualRef = useRef(false);
   const resumeTimer = useRef<number | null>(null);
+  const onNextRef = useRef(onNext);
+  onNextRef.current = onNext;
+
+  const animControlRef = useRef<{
+    pause: () => void;
+    resume: () => void;
+  } | null>(null);
 
   const moveTo = useCallback((clientX: number) => {
     const rect = frameRef.current?.getBoundingClientRect();
     if (!rect || rect.width === 0) return;
     const pct = ((clientX - rect.left) / rect.width) * 100;
-    setPos(Math.min(100, Math.max(0, pct)));
+    const clamped = Math.min(100, Math.max(0, pct));
+    posRef.current = clamped;
+    setPos(clamped);
   }, []);
 
-  /* auto sweep: slow ping-pong across the FULL 0–100 range,
-     with a deliberate hold at each edge before reversing */
+  /* Automated slider cycle:
+     1. Start at 50% (middle) for 0.6s
+     2. Glide smoothly from 50% to 100% (right) over 1.8s
+     3. Hold at 100% (right) for 1.0s (full original image shown)
+     4. Sweep smoothly all over from 100% to 0% (left) over 2.6s
+     5. Hold at 0% (left) for 1.0s (full upscaled image shown)
+     6. Glide smoothly from 0% back to 50% (middle) over 1.8s
+     7. Hold at 50% (middle) for 1.0s
+     8. Advance to next image via onNext()!
+  */
   useEffect(() => {
-    if (!auto || prefersReducedMotion()) return;
-    let raf = 0;
-    let last = performance.now();
-    let hold = 0; // seconds remaining to pause at an edge
-    const tick = (t: number) => {
-      const dt = Math.min(0.05, (t - last) / 1000);
-      last = t;
-      if (hold > 0) {
-        hold -= dt;
-      } else {
-        setPos((p) => {
-          let next = p + dirRef.current * dt * 9;
-          if (next >= 100) {
-            next = 100;
-            dirRef.current = -1;
-            hold = 1.4; // pause fully on the "after" side
-          } else if (next <= 0) {
-            next = 0;
-            dirRef.current = 1;
-            hold = 1.4; // pause fully on the "before" side
-          }
-          return next;
-        });
-      }
-      raf = requestAnimationFrame(tick);
+    if (prefersReducedMotion()) {
+      const timer = window.setTimeout(() => {
+        onNextRef.current();
+      }, 7000);
+      return () => window.clearTimeout(timer);
+    }
+
+    let rafId = 0;
+    let lastTime = performance.now();
+    let stage:
+      | 'INITIAL_HOLD'
+      | 'TO_RIGHT'
+      | 'HOLD_RIGHT'
+      | 'TO_LEFT'
+      | 'HOLD_LEFT'
+      | 'TO_MIDDLE'
+      | 'HOLD_MIDDLE'
+      | 'RESUME_MIDDLE'
+      | 'DONE' = 'INITIAL_HOLD';
+    let stageTime = 0;
+    let startPos = 50;
+
+    const DURATION_INITIAL_HOLD = 0.8;
+    const DURATION_TO_RIGHT = 3.0; // Smooth, gentle glide to right (50% -> 100%)
+    const DURATION_HOLD_RIGHT = 1.4; // Pause to inspect full original image
+    const DURATION_TO_LEFT = 4.4; // Gentle full-width sweep to left (100% -> 0%)
+    const DURATION_HOLD_LEFT = 1.4; // Pause to inspect full 4x upscaled image
+    const DURATION_TO_MIDDLE = 3.0; // Gentle return to center (0% -> 50%)
+    const DURATION_HOLD_MIDDLE = 1.5; // Pause at split comparison before next image
+
+    const easeInOutCubic = (t: number) =>
+      t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+    animControlRef.current = {
+      pause: () => {
+        isManualRef.current = true;
+      },
+      resume: () => {
+        isManualRef.current = false;
+        stage = 'RESUME_MIDDLE';
+        stageTime = 0;
+        startPos = posRef.current;
+        lastTime = performance.now();
+      },
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [auto]);
+
+    const tick = (now: number) => {
+      const dt = Math.min(0.1, (now - lastTime) / 1000);
+      lastTime = now;
+
+      if (!isManualRef.current) {
+        stageTime += dt;
+
+        if (stage === 'INITIAL_HOLD') {
+          if (stageTime >= DURATION_INITIAL_HOLD) {
+            stage = 'TO_RIGHT';
+            stageTime = 0;
+            startPos = posRef.current;
+          }
+        } else if (stage === 'TO_RIGHT') {
+          const p = Math.min(1, stageTime / DURATION_TO_RIGHT);
+          const current = startPos + (100 - startPos) * easeInOutCubic(p);
+          posRef.current = current;
+          setPos(current);
+          if (p >= 1) {
+            posRef.current = 100;
+            setPos(100);
+            stage = 'HOLD_RIGHT';
+            stageTime = 0;
+          }
+        } else if (stage === 'HOLD_RIGHT') {
+          posRef.current = 100;
+          setPos(100);
+          if (stageTime >= DURATION_HOLD_RIGHT) {
+            stage = 'TO_LEFT';
+            stageTime = 0;
+            startPos = 100;
+          }
+        } else if (stage === 'TO_LEFT') {
+          const p = Math.min(1, stageTime / DURATION_TO_LEFT);
+          const current = startPos + (0 - startPos) * easeInOutCubic(p);
+          posRef.current = current;
+          setPos(current);
+          if (p >= 1) {
+            posRef.current = 0;
+            setPos(0);
+            stage = 'HOLD_LEFT';
+            stageTime = 0;
+          }
+        } else if (stage === 'HOLD_LEFT') {
+          posRef.current = 0;
+          setPos(0);
+          if (stageTime >= DURATION_HOLD_LEFT) {
+            stage = 'TO_MIDDLE';
+            stageTime = 0;
+            startPos = 0;
+          }
+        } else if (stage === 'TO_MIDDLE') {
+          const p = Math.min(1, stageTime / DURATION_TO_MIDDLE);
+          const current = startPos + (50 - startPos) * easeInOutCubic(p);
+          posRef.current = current;
+          setPos(current);
+          if (p >= 1) {
+            posRef.current = 50;
+            setPos(50);
+            stage = 'HOLD_MIDDLE';
+            stageTime = 0;
+          }
+        } else if (stage === 'HOLD_MIDDLE') {
+          posRef.current = 50;
+          setPos(50);
+          if (stageTime >= DURATION_HOLD_MIDDLE) {
+            stage = 'DONE';
+            onNextRef.current();
+            return;
+          }
+        } else if (stage === 'RESUME_MIDDLE') {
+          const p = Math.min(1, stageTime / 1.8);
+          const current = startPos + (50 - startPos) * easeInOutCubic(p);
+          posRef.current = current;
+          setPos(current);
+          if (p >= 1) {
+            posRef.current = 50;
+            setPos(50);
+            stage = 'INITIAL_HOLD';
+            stageTime = 0;
+          }
+        }
+      }
+
+      rafId = requestAnimationFrame(tick);
+    };
+
+    rafId = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(rafId);
+    };
+  }, []);
 
   useEffect(
     () => () => {
@@ -171,23 +301,25 @@ const CompareLens: React.FC<{ pair: ShowcasePair }> = ({ pair }) => {
     []
   );
 
-  const stopAuto = () => {
+  const handleManualAction = () => {
     if (resumeTimer.current) window.clearTimeout(resumeTimer.current);
-    setAuto(false);
+    animControlRef.current?.pause();
   };
 
   const scheduleResume = () => {
     if (resumeTimer.current) window.clearTimeout(resumeTimer.current);
-    resumeTimer.current = window.setTimeout(() => setAuto(true), 4000);
+    resumeTimer.current = window.setTimeout(() => {
+      animControlRef.current?.resume();
+    }, 3000);
   };
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    stopAuto();
+    handleManualAction();
     dragRef.current = true;
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {
-      /* older browsers — window listeners below still work */
+      /* older browsers */
     }
     moveTo(e.clientX);
   };
@@ -205,7 +337,7 @@ const CompareLens: React.FC<{ pair: ShowcasePair }> = ({ pair }) => {
   return (
     <div
       ref={frameRef}
-      className="uc-lens"
+      className={`uc-lens ${pair.width / pair.height > 1 ? 'is-landscape' : ''}`}
       style={{ aspectRatio: pair.aspect, '--ar': pair.width / pair.height } as React.CSSProperties}
       role="slider"
       tabIndex={0}
@@ -221,10 +353,12 @@ const CompareLens: React.FC<{ pair: ShowcasePair }> = ({ pair }) => {
       onKeyDown={(e) => {
         if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
           e.preventDefault();
-          stopAuto();
-          setPos((p) =>
-            Math.min(100, Math.max(0, p + (e.key === 'ArrowRight' ? 4 : -4)))
-          );
+          handleManualAction();
+          setPos((p) => {
+            const next = Math.min(100, Math.max(0, p + (e.key === 'ArrowRight' ? 4 : -4)));
+            posRef.current = next;
+            return next;
+          });
           scheduleResume();
         }
       }}
@@ -248,30 +382,33 @@ const CompareLens: React.FC<{ pair: ShowcasePair }> = ({ pair }) => {
       </span>
 
       {/* corner tags */}
-      <span className="uc-tag uc-tag-before">BEFORE</span>
-      <span className="uc-tag uc-tag-after">AFTER</span>
+      <span className={`uc-tag uc-tag-before ${pos >= 85 ? 'is-active' : ''}`}>BEFORE</span>
+      <span className={`uc-tag uc-tag-after ${pos <= 15 ? 'is-active' : ''}`}>AFTER</span>
     </div>
   );
 };
 
 /* ============================================================
    SECTION 1 — HERO SHOWCASE
-   Auto-cycles through every pair; hovering anything pauses it.
+   Auto-cycles through every pair with full slider sweep choreography.
    ============================================================ */
 export const UpscaleShowcase: React.FC = () => {
   const rootRef = useReveal<HTMLDivElement>();
   const [active, setActive] = useState(1); // default: Porsche (portrait, dramatic)
-  const [paused, setPaused] = useState(false);
 
-  /* auto-change the showcased image every few seconds */
+  const handleNext = useCallback(() => {
+    setActive((a) => (a + 1) % PAIRS.length);
+  }, []);
+
+  /* Preload all showcase images so transitions are instant with zero flicker */
   useEffect(() => {
-    if (paused || prefersReducedMotion()) return;
-    const id = window.setInterval(
-      () => setActive((a) => (a + 1) % PAIRS.length),
-      CYCLE_MS
-    );
-    return () => window.clearInterval(id);
-  }, [paused]);
+    PAIRS.forEach((p) => {
+      const img1 = new Image();
+      img1.src = p.before;
+      const img2 = new Image();
+      img2.src = p.after;
+    });
+  }, []);
 
   return (
     <section className="uc-showcase" ref={rootRef}>
@@ -279,11 +416,7 @@ export const UpscaleShowcase: React.FC = () => {
       <div className="uc-glow uc-glow-a" aria-hidden="true" />
       <div className="uc-glow uc-glow-b" aria-hidden="true" />
 
-      <div
-        className="uc-showcase-inner"
-        onMouseEnter={() => setPaused(true)}
-        onMouseLeave={() => setPaused(false)}
-      >
+      <div className="uc-showcase-inner">
         {/* ---------------- LEFT: floating gallery ---------------- */}
         <div className="uc-gallery uc-gallery-left" aria-hidden="true">
           {PAIRS.slice(0, 2).map((p, i) => (
@@ -322,7 +455,7 @@ export const UpscaleShowcase: React.FC = () => {
           </p>
 
           <div className="pb-reveal uc-lens-wrap" style={{ '--rv-i': 3 } as React.CSSProperties}>
-            <CompareLens key={PAIRS[active].id} pair={PAIRS[active]} />
+            <CompareLens key={PAIRS[active].id} pair={PAIRS[active]} onNext={handleNext} />
           </div>
 
           {/* stat pills */}

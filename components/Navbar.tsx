@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
-import { Menu, Trash2 } from 'lucide-react';
+import { Menu, Trash2, WifiOff, Wifi, Cpu, Gauge, ExternalLink } from 'lucide-react';
 import type { ViewTab, ThemeMode } from '../types';
 import type { ModelDownloadItem } from '../types';
 import Icon from './Icon';
@@ -34,8 +34,13 @@ interface NavbarProps {
   historyCount?: number;
   /** Opens the mobile navigation sidebar (hamburger, < md only) */
   onOpenMobileSidebar?: () => void;
+  /** Whether the mobile navigation sidebar drawer is currently open */
+  isMobileSidebarOpen?: boolean;
   /** Hides the navbar on mobile (< lg) — e.g. when the upscaler workspace owns the screen */
   mobileHidden?: boolean;
+  /** Offline / online status */
+  isOnline?: boolean;
+  justReconnected?: boolean;
 }
 
 /** Small dynamic engine pill used in the settings dropdown & mobile sidebar (exported) */
@@ -80,9 +85,13 @@ export default function Navbar({
   onClearModelCache,
   historyCount = 0,
   onOpenMobileSidebar,
+  isMobileSidebarOpen = false,
   mobileHidden = false,
+  isOnline = true,
+  justReconnected = false,
 }: NavbarProps) {
-  const { warmup } = useApp();
+  const { warmup, isMobileSidebarOpen: ctxMobileOpen } = useApp();
+  const isMobileMenuOpen = isMobileSidebarOpen || ctxMobileOpen || false;
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
@@ -108,6 +117,7 @@ export default function Navbar({
      Next.js navigation to land. Synced back from activeTab for browser
      back/forward and links outside the navbar. */
   const [pillTab, setPillTab] = useState<ViewTab>(activeTab);
+  const [pillPos, setPillPos] = useState({ x: 0, y: 0 });
 
   const measureActivePill = useCallback((tab: ViewTab) => {
     const nav = navRef.current;
@@ -119,6 +129,10 @@ export default function Navbar({
     }
     const btnRect = btn.getBoundingClientRect();
     const navRect = nav.getBoundingClientRect();
+    const x = btnRect.left - navRect.left - nav.clientLeft;
+    const y = btnRect.top - navRect.top - nav.clientTop;
+    setPillPos({ x, y });
+
     const style: React.CSSProperties = {
       opacity: 1,
       width: btnRect.width,
@@ -126,7 +140,7 @@ export default function Navbar({
       /* An absolutely positioned child's containing block is the nav's PADDING
          box (left-0 sits inside the border), so subtract the border width —
          otherwise the pill sits 1px right/down of the button. */
-      transform: `translate(${btnRect.left - navRect.left - nav.clientLeft}px, ${btnRect.top - navRect.top - nav.clientTop}px)`,
+      transform: `translate(${x}px, ${y}px)`,
       /* transform + width animate the slide; must be EXPLICIT on every update
          (React drops the key when absent → transition 'none' → instant jump). */
       transition: pillNeedTransition.current
@@ -143,9 +157,10 @@ export default function Navbar({
   const selectTab = useCallback(
     (tab: ViewTab) => {
       setPillTab(tab);
+      measureActivePill(tab);
       onTabChange(tab);
     },
-    [onTabChange]
+    [measureActivePill, onTabChange]
   );
 
   // Route changed from outside the navbar (back/forward, footer links) → follow it.
@@ -237,13 +252,10 @@ export default function Navbar({
             <Menu size={20} strokeWidth={2.2} />
           </button>
 
-          {/* LOGO (LEFT SIDE: Frosted Glass Capsule with Blur) */}
+          {/* LOGO (Mobile: All the way right & fades when sidebar opens, Desktop: Left) */}
           <div
-            onClick={() => selectTab('home')}
-            className="pointer-events-auto
+            className={`pointer-events-auto
               h-11
-              cursor-pointer
-              group
               shrink-0
               flex
               items-center
@@ -251,43 +263,45 @@ export default function Navbar({
               border-0
               p-0
               shadow-none
-              transition-transform
+              transition-all
               duration-300
-              active:scale-95"
+              order-3 md:order-1
+              ${isMobileMenuOpen
+                ? 'max-md:opacity-0 max-md:pointer-events-none max-md:scale-90 max-md:invisible'
+                : 'max-md:opacity-100 max-md:scale-100 max-md:visible'
+              }`}
           >
-            {/* LOGO — LEFT */}
-              <button
-                type="button"
-                onClick={() => selectTab("home")}
+            <button
+              type="button"
+              onClick={() => selectTab("home")}
               className="
-                  pointer-events-auto
-                  shrink-0
-                  h-11
-                  flex
-                  items-center
-                  justify-center
-                  cursor-pointer
-                  bg-transparent
-                  border-0
-                  outline-none
-                  p-0
-                  transition-transform
-                  duration-200
-                  hover:scale-[1.025]
-                  active:scale-[0.97]
-                "
+                pointer-events-auto
+                shrink-0
+                h-11
+                flex
+                items-center
+                justify-center
+                cursor-pointer
+                bg-transparent
+                border-0
+                outline-none
+                p-0
+                transition-transform
+                duration-200
+                hover:scale-[1.025]
+                active:scale-[0.97]
+              "
               aria-label="Go to home"
             >
               <Logo
                 size="sm"
                 className="
-                    origin-left
-                    scale-[0.72]
-                    sm:scale-[0.78]
-                  "
+                  origin-right md:origin-left
+                  scale-[0.72]
+                  sm:scale-[0.78]
+                "
               />
             </button>
-
           </div>
 
           {/* DESKTOP CENTERED FLOATING PILL NAV BAR (HIDDEN ON MOBILE < md) */}
@@ -296,32 +310,69 @@ export default function Navbar({
             aria-label="Desktop Navigation"
             className="pointer-events-auto hidden md:flex absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 h-11 bg-white/10 border border-white/20 rounded-full p-1 items-center gap-1 backdrop-blur-xl shadow-xl will-change-transform"
           >
-            {/* WHITE ACTIVE PILL — compositor-driven transform transition */}
-            <span
-              aria-hidden="true"
-              style={activePillStyle}
-              className="pointer-events-none absolute left-0 top-0 rounded-full bg-white shadow-md"
-            />
-
+            {/* BASE LAYER (clickable buttons with light text) */}
             {DESKTOP_NAV_ITEMS.map(({ tab, label, warmup: needsWarmup }) => (
               <button
                 key={tab}
                 ref={(el) => { navBtnRefs.current[tab] = el; }}
+                type="button"
                 onClick={() => selectTab(tab)}
                 onMouseEnter={needsWarmup ? () => warmup(tab) : undefined}
-                className={`relative h-full px-5 rounded-full text-sm flex items-center justify-center whitespace-nowrap transition-colors duration-300 ${
-                  activeTab === tab
-                    ? 'font-bold text-black'
-                    : 'font-medium text-neutral-300 hover:text-white'
-                }`}
+                className="relative z-10 h-full px-5 rounded-full text-sm font-semibold flex items-center justify-center whitespace-nowrap text-neutral-300 hover:text-white transition-colors duration-200"
               >
-                <span className="relative z-10">{label}</span>
+                <span>{label}</span>
               </button>
             ))}
+
+            {/* WHITE ACTIVE PILL — clip-mask reveal layer */}
+            <span
+              aria-hidden="true"
+              style={activePillStyle}
+              className="pointer-events-none absolute left-0 top-0 z-20 rounded-full bg-white shadow-md overflow-hidden"
+            >
+              {/* Synchronized counter-translated mirror container */}
+              <span
+                aria-hidden="true"
+                className="absolute left-0 top-0 h-11 p-1 flex items-center gap-1 whitespace-nowrap"
+                style={{
+                  transform: `translate(${-pillPos.x}px, ${-pillPos.y}px)`,
+                  transition: activePillStyle.transition,
+                }}
+              >
+                {DESKTOP_NAV_ITEMS.map(({ tab, label }) => (
+                  <span
+                    key={tab}
+                    className="h-full px-5 rounded-full text-sm font-semibold flex items-center justify-center whitespace-nowrap text-black select-none"
+                  >
+                    {label}
+                  </span>
+                ))}
+              </span>
+            </span>
           </nav>
 
-          {/* RIGHT SIDE GROUP: model downloads badge + settings gear */}
-          <div className="pointer-events-auto relative ml-auto flex items-center gap-2.5">
+          {/* RIGHT SIDE GROUP: connection badge + model downloads badge + settings gear */}
+          <div className="pointer-events-auto relative ml-auto flex items-center gap-2 order-2 md:order-2">
+            {/* OFFLINE / RECONNECTED BADGE */}
+            {!isOnline ? (
+              <div
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-semibold backdrop-blur-md shadow-sm transition-all"
+                title="Offline Mode — WebGPU & WebAssembly AI runs 100% locally on your device"
+              >
+                <WifiOff size={13} className="text-amber-400 animate-pulse shrink-0" />
+                <span className="hidden sm:inline">Offline</span>
+                <span className="sm:hidden">Offline</span>
+              </div>
+            ) : justReconnected ? (
+              <div
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#00FF85]/15 border border-[#00FF85]/30 text-[#00FF85] text-[11px] font-semibold backdrop-blur-md shadow-sm animate-fade-in"
+                title="Online — Back online"
+              >
+                <Wifi size={13} className="text-[#00FF85] shrink-0" />
+                <span className="hidden sm:inline">Online</span>
+              </div>
+            ) : null}
+
             {/* MODEL DOWNLOADS BADGE — only while models are transferring */}
             {modelDownloads.length > 0 && (
               <ModelDownloadIndicator items={modelDownloads} />
@@ -340,38 +391,46 @@ export default function Navbar({
 
             {/* SETTINGS DROPDOWN MENU */}
             {isSettingsOpen && (
-              <div className="absolute right-0 mt-3 w-72 rounded-2xl bg-[#121218] border border-white/15 p-3.5 shadow-2xl z-50 animate-fade-in flex flex-col gap-3">
-                <div className="px-1 py-0.5 border-b border-white/10 flex flex-col gap-1.5 text-xs font-bold text-white pb-2">
-                  <span>Settings & Preferences</span>
-                  <EngineRow label="AI Upscaler engine" engine={upscalerEngine} />
-                  <EngineRow label="BG Remover engine" engine={bgEngine} />
+              <div className="absolute right-0 mt-2.5 w-72 rounded-2xl bg-[#121218]/95 backdrop-blur-xl border border-white/15 p-3 shadow-2xl z-50 animate-fade-in flex flex-col gap-2">
+                <div>
+                  <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-violet-200/70">
+                    <Cpu size={12} /> Processing engines <span className="ml-auto h-px flex-1 bg-gradient-to-r from-violet-300/20 to-transparent" />
+                  </div>
+                  <div className="space-y-1 rounded-xl border border-white/[0.07] bg-black/25 px-2.5 py-2">
+                    <div className="settings-row-enter engine-row-shell" style={{ animationDelay: '55ms' }}><EngineRow label="Upscaler" engine={upscalerEngine} /></div>
+                    <div className="settings-row-enter engine-row-shell" style={{ animationDelay: '105ms' }}><EngineRow label="BG Remover" engine={bgEngine} /></div>
+                  </div>
+                  <div className="settings-row-enter mt-1.5 flex items-center justify-between rounded-xl border border-violet-200/[0.13] bg-gradient-to-r from-violet-300/[0.08] via-white/[0.035] to-teal-200/[0.06] px-2.5 py-1.5" style={{ animationDelay: '155ms' }}>
+                    <span className="flex items-center gap-1.5 text-[11px] font-medium text-white/70"><Gauge size={13} className="text-violet-200/70" />WebGPU support</span>
+                    <span className={`text-[10px] font-semibold ${webgpuAvailable === null ? 'text-white/40' : webgpuAvailable ? 'text-emerald-300' : 'text-sky-300'}`}>
+                      {webgpuAvailable === null ? 'Checking' : webgpuAvailable ? 'Available' : 'Unavailable'}
+                    </span>
+                  </div>
+                  <p className="mt-1.5 px-0.5 text-[9.5px] leading-relaxed text-white/35">{modelStatus}</p>
                 </div>
-                <div className="flex items-center justify-between px-1 text-[11px]">
-                  <span className="font-semibold text-neutral-400">WebGPU availability</span>
-                  <span className={`font-mono text-[9.5px] font-bold ${webgpuAvailable === null ? 'text-neutral-500' : webgpuAvailable ? 'text-[#00FF85]' : 'text-sky-300'}`}>
-                    {webgpuAvailable === null ? 'CHECKING…' : webgpuAvailable ? 'Fast' : 'Standard'}
-                  </span>
-                </div>
-                <p className="px-1 text-[10px] leading-relaxed text-neutral-500">{modelStatus}</p>
+
+                <div className="settings-row-enter grid grid-cols-2 gap-1.5 pt-1.5" style={{ animationDelay: '205ms' }}>
                   <button
                     type="button"
                     onClick={onClearModelCache}
                     disabled={isClearingModelCache || !canClearModelCache}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] font-semibold text-neutral-300 transition-colors hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.04] px-2 py-2 text-center text-[11px] font-medium text-white/70 hover:bg-white/[0.08] hover:text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                     title="Remove downloaded AI models from this browser"
                   >
-                    <Trash2 size={14} />
-                    {isClearingModelCache ? 'Clearing models…' : 'Clear downloaded models'}
+                    <Trash2 size={13} className="shrink-0 text-white/50" />
+                    <span className="truncate">{isClearingModelCache ? 'Clearing…' : 'Clear models'}</span>
                   </button>
-                  <p className="mt-1.5 px-1 text-[9px] leading-relaxed text-neutral-600">Stored locally; the browser may still evict site data.</p>
                   <Link
                     href={"/blogs/enable_webgpu_guide_b5c9e8"}
                     onClick={()=>setIsSettingsOpen(false)}
-                    className="mt-1.5 block px-0.5 text-[10px] font-medium text-[#00FF85] hover:text-[#00FF85]/80 hover:underline transition-colors leading-relaxed"
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-violet-400/20 bg-violet-400/[0.07] px-2 py-2 text-center text-[11px] font-medium text-violet-200 hover:bg-violet-400/[0.14] hover:text-violet-100 transition-colors"
+                    title="Learn how to enable WebGPU in your browser"
                   >
-                    Learn how to enable webGPU on your browser!
+                    <ExternalLink size={13} className="shrink-0 text-violet-300" />
+                    <span className="truncate">Learn about WebGPU</span>
                   </Link>
                 </div>
+              </div>
             )}
             </div>
           </div>

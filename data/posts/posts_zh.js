@@ -133,24 +133,150 @@ export const POSTS_ZH = [
         title: '去哪里找',
         text: '设置（齿轮图标）→ 引擎徽章。每个工具都会报告其自身的实时引擎，这是从运行时直接读取而非凭空假设的，因此徽章反映的是现实，而不是对功能检测的乐观臆测。',
       },
-      { type: 'h2', text: '桌面端的 Chrome 与 Edge' },
+      { type: 'h2', text: 'Chrome 和 Microsoft Edge', icons: ['chrome', 'edge'] },
       {
         type: 'p',
-        text: '近期的 Chrome 和 Edge 版本在大多数桌面硬件上默认启用了 WebGPU。如果徽章仍然显示 CPU 回退，那么实验性标志就是下一站。导航到浏览器的实验性功能页面（两个浏览器的地址均为 chrome://flags），搜索“WebGPU”，将该条目从 Default 更改为 Enabled，然后在提示时重新启动。在 Linux 上，历史上需要额外的启动参数；而在 Windows 和 macOS 上，通常只需重启即可。',
+        text: '如果你的浏览器正在使用 CPU 回退（fallback）而非 GPU 硬件加速，启用相应的 WebGPU 实验性标志（flag）或许有助于解决该问题。请按照以下步骤在 Google Chrome 或 Microsoft Edge 中检查并配置 WebGPU。',
+      },
+      {
+        type: 'img',
+        src: '/blogs/how-to-webgpu-chrome.png',
+        alt: '在 Google Chrome 和 Microsoft Edge 中启用 WebGPU 实验性标志',
+        caption: '在 chrome://flags 或 edge://flags 中搜索 "WebGPU" 并启用该标志。',
+      },
+      { type: 'h3', text: '步骤 1：打开浏览器实验性标志页面' },
+      {
+        type: 'p',
+        text: '在电脑桌面上启动 Google Chrome 或 Microsoft Edge。点击地址栏，在 Chrome 中输入 chrome://flags 或在 Microsoft Edge 中输入 edge://flags，然后按 Enter 回车键以访问实验性功能页面。',
+      },
+      { type: 'h3', text: '步骤 2：搜索 WebGPU' },
+      {
+        type: 'p',
+        text: '打开 Experiments 页面后，找到顶部的搜索框。输入 WebGPU 过滤可用的实验性设置，找到相关的 WebGPU 标志。',
+      },
+      { type: 'h3', text: '步骤 3：启用 WebGPU 标志' },
+      {
+        type: 'p',
+        text: '找到如下图所示的 "Force enable WebGPU interop" 选项。点击其旁边的下拉菜单，将选项从 Default 更改为 Enabled。',
       },
       {
         type: 'p',
-        text: '如果启用该标志后徽章没有改变，原因通常在浏览器底层：显卡驱动。WebGPU 需要相对较新的驱动程序，笔记本电脑用户应确保浏览器运行在独立 GPU 而不是集成 GPU 上；许多机器默认将浏览器设置为节能模式，这会悄悄限制计算能力。浏览器的自带 GPU 诊断页面和操作系统的图形设置都可以暴露出这一点。',
+        text: '该标志主要适用于特定的图形硬件配置，尤其是 Linux 上基于 Vulkan 的环境。如果该选项不可用或不适用于你的系统，并不意味着必须开启它 WebGPU 才能运行。',
       },
-      { type: 'h2', text: 'Firefox' },
+      { type: 'h3', text: '步骤 4：重新启动浏览器' },
       {
         type: 'p',
-        text: 'Firefox 在当前的发布版本中内置了 WebGPU 支持，并在主流平台上默认启用。在旧版本中，它藏在相同的标志机制后面：打开实验性配置页面（about:config），搜索 WebGPU 条目，然后逐个启用它们。Firefox 历来是该功能最保守的发布者，因此在这里保持浏览器更新比在其他任何地方都重要；每个版本都意义重大地扩展了硬件支持范围。',
+        text: '修改标志后，如果浏览器底部显示 Relaunch（重启）按钮，请点击它。这将重启浏览器并应用更新后的实验性设置。重启前请务必保存所有未完成的工作。',
       },
-      { type: 'h2', text: 'macOS 上的 Safari' },
+      { type: 'h3', text: '步骤 5：验证 WebGPU 功能' },
       {
         type: 'p',
-        text: 'Safari 从近期的 macOS 和 Safari 版本开始支持 WebGPU，在受支持的硬件上默认开启。这里没有需要寻找的标志；如果徽章显示回退，更新路径就是修复方法：当前的 macOS 版本加上当前的 Safari。Apple 硅芯片 Mac 完全具备此能力，并且统一内存架构在图像工作负载上表现良好，因为数据永远不会离开计算单元的邻近区域。',
+        text: '重启后，重新打开你的 WebGPU 应用，检查 CPU 回退警告是否已消失。你也可以在 Chrome 中访问 chrome://gpu 或在 Edge 中访问 edge://gpu，检查浏览器的图形硬件配置并排查潜在的 GPU 相关问题。',
+      },
+      { type: 'h3', text: '如果 WebGPU 仍然无法工作怎么办？' },
+      {
+        type: 'p',
+        text: '如果 WebGPU 依然退回到 CPU 运行，问题可能与显卡驱动兼容性、浏览器设置或硬件支持有关。请更新显卡驱动程序，检查浏览器是否正确调用了高性能独立显卡，并查看浏览器的 GPU 诊断日志排查报错。',
+      },
+      {
+        type: 'callout',
+        title: '提示',
+        text: '在许多受支持的桌面操作系统上，WebGPU 默认已处于开启状态。可用的标志及其效果因浏览器版本和操作系统而异，因此启用标志并不绝对保证能获得 GPU 加速。',
+      },
+      { type: 'h2', text: 'Mozilla Firefox', icons: ['firefox'] },
+      {
+        type: 'p',
+        text: 'Firefox 在现代版本中已内置 WebGPU 支持，并在各大主流平台上默认启用。如果你的系统仍然提示 CPU 回退，可以按照以下步骤通过 Firefox 的高级配置编辑器手动检查或启用 WebGPU。',
+      },
+      { type: 'h3', text: '步骤 1：打开高级配置页面' },
+      {
+        type: 'p',
+        text: '在桌面启动 Firefox，在地址栏中输入 about:config 并按 Enter 回车键。',
+      },
+      { type: 'h3', text: '步骤 2：接受警告提示并继续' },
+      {
+        type: 'p',
+        text: 'Firefox 会弹出警告提示，说明修改高级首选项可能会影响性能与稳定性。点击“接受风险并继续”以进入配置编辑器。',
+      },
+      { type: 'h3', text: '步骤 3：搜索 WebGPU 首选项' },
+      {
+        type: 'p',
+        text: '在顶部的首选项名称搜索框中输入 dom.webgpu.enabled，找到核心的 WebGPU 设置项。',
+      },
+      { type: 'h3', text: '步骤 4：将 WebGPU 标志切换为 True' },
+      {
+        type: 'p',
+        text: '双击 dom.webgpu.enabled（或点击右侧的切换按钮），将其值从 false 切换为 true。如果你的图形配置需要强制加速（特别是在使用 Vulkan 的 Linux 系统上），还可以搜索 gfx.webgpu.force-enabled 并同样将其切换为 true。',
+      },
+      { type: 'h3', text: '步骤 5：重启 Firefox 并验证' },
+      {
+        type: 'p',
+        text: '完全关闭并重新打开 Firefox 以使更改生效。访问 about:support 查看“图形”部分确认 WebGPU 状态，或重新加载 Pixelify 并在“设置”中检查引擎徽章。',
+      },
+      { type: 'h3', text: 'Firefox 疑难解答' },
+      {
+        type: 'p',
+        text: 'Firefox 历史上需要 Linux/Windows 上最新的 Vulkan 驱动以及 macOS 上的 Metal。如果 Firefox 仍然退回到 CPU，请确保显卡驱动已更新至厂商最新版本，并在 about:support 中确认 WebRender 正运行在硬件加速模式下。',
+      },
+      { type: 'h2', text: 'Brave Browser', icons: ['brave'] },
+      {
+        type: 'p',
+        text: 'Brave 基于 Chromium 构建，享有与 Chrome 同样强大的硬件加速引擎。不过，由于 Brave 内置了严格的隐私防护盾（Shields）以及特殊的默认标志设置，WebGPU 有时会受到限制。请按照以下步骤在 Brave 中启用 WebGPU。',
+      },
+      { type: 'h3', text: '步骤 1：打开 Brave 标志页面' },
+      {
+        type: 'p',
+        text: '在电脑桌面上打开 Brave 浏览器。在地址栏输入 brave://flags 并按 Enter 回车键以打开实验性设置页面。',
+      },
+      { type: 'h3', text: '步骤 2：搜索 WebGPU' },
+      {
+        type: 'p',
+        text: '在 Experiments 页面顶部的搜索框中输入 WebGPU，筛选所有与 WebGPU 相关的设置。',
+      },
+      { type: 'h3', text: '步骤 3：启用 WebGPU 标志' },
+      {
+        type: 'p',
+        text: '找到 "Force enable WebGPU interop" 及/或 "Unsafe WebGPU" 标志。点击每个适用设置旁边的下拉菜单，将其从 Default 切换为 Enabled。',
+      },
+      { type: 'h3', text: '步骤 4：检查 Brave Shields 指纹防护设置' },
+      {
+        type: 'p',
+        text: 'Brave Shields 默认开启指纹追踪阻止功能，有时这会阻止网站查询你的 GPU 适配器详细信息。如果 Pixelify 仍无法初始化 GPU，请点击地址栏中的 Brave 狮子盾牌图标，确认该站点的指纹防护未设置为“严格（Aggressive）”。',
+      },
+      { type: 'h3', text: '步骤 5：重启 Brave 并验证' },
+      {
+        type: 'p',
+        text: '点击标志页面底部的 Relaunch 按钮重启 Brave。重启后，访问 brave://gpu 检查 WebGPU 状态，或返回 Pixelify 确认引擎状态是否显示 GPU 加速。',
+      },
+      { type: 'h3', text: 'Brave 疑难解答' },
+      {
+        type: 'p',
+        text: '如果 Brave 仍然使用 CPU 回退，请前往 brave://settings/system 并确认“在可用时使用图形加速”已开启。同时确保操作系统已将 Brave 分配给高性能独立 GPU 运行。',
+      },
+      { type: 'h2', text: 'Safari on macOS', icons: ['safari'] },
+      {
+        type: 'p',
+        text: 'Safari 从近期的 macOS 与 Safari 版本开始提供 WebGPU 支持，并在支持的 Apple Silicon 与现代 Intel 硬件上默认开启。如果你需要在 Safari 中检查或配置 WebGPU，请按照以下步骤操作。',
+      },
+      { type: 'h3', text: '步骤 1：启用“开发”菜单' },
+      {
+        type: 'p',
+        text: '在 macOS 上打开 Safari。在顶部菜单栏中，点击 Safari 浏览器 > 设置（或偏好设置），选择“高级”标签页，然后勾选“为网页开发者显示功能”（或旧版中的“在菜单栏中显示‘开发’菜单”）。',
+      },
+      { type: 'h3', text: '步骤 2：打开功能标志（Feature Flags）' },
+      {
+        type: 'p',
+        text: '点击顶部菜单栏中的“开发”菜单，导航至“功能标志（Feature Flags）”（在旧版 Safari 中为“实验性功能”）。',
+      },
+      { type: 'h3', text: '步骤 3：启用 WebGPU' },
+      {
+        type: 'p',
+        text: '在搜索框中输入 WebGPU。找到 WebGPU 条目并确保其复选框已勾选/启用。',
+      },
+      { type: 'h3', text: '步骤 4：重启 Safari 并验证' },
+      {
+        type: 'p',
+        text: '退出并重新打开 Safari。重新打开 Pixelify 并检查“设置”（齿轮图标）中的引擎状态徽章，确认 GPU 硬件加速已生效。',
       },
       { type: 'h2', text: 'Android 与 iOS' },
       {

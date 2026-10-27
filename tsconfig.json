@@ -19,11 +19,10 @@
         "name": "next"
       }
     ],
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./*"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "out", "public"]
+  "exclude": ["node_modules", "out", "public", "z.tsx"]
 }

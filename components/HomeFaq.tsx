@@ -33,7 +33,7 @@ const FAQ_ITEMS: FaqItem[] = [
   },
   {
     q: 'Are my private photos and client confidential assets safe?',
-    a: '100% safe. You can inspect your browser’s Developer Tools Network tab during processing: no image payloads, no thumbnail previews, and no tracking telemetry ever leave your device. It is completely safe for enterprise client NDAs and confidential photography.',
+    a: 'Your image data stays on your device. You can inspect your browser’s Developer Tools Network tab during processing: no image payloads or editing activity are sent to a server. A separate aggregate site-visit counter, described in our privacy policy, never receives image data.',
   },
   {
     q: 'How do I clear downloaded models if I need to free up browser storage?',
@@ -49,7 +49,7 @@ export default function HomeFaq() {
   };
 
   return (
-    <section className="w-full max-w-[960px] mx-auto bg-transparent text-white py-12 sm:py-16 lg:py-20 px-4 sm:px-6 relative z-20 my-4 sm:my-8">
+    <section id="home-faq" className="w-full bg-transparent text-white py-12 sm:py-16 lg:py-20 relative z-20 my-4 sm:my-8">
       {/* FAQPage structured data for search engines */}
       <script
         type="application/ld+json"
@@ -99,14 +99,7 @@ export default function HomeFaq() {
                   aria-expanded={isOpen}
                   className="group flex items-center justify-between gap-4 w-full py-5 sm:py-6 text-left cursor-pointer transition-colors duration-200 select-none"
                 >
-                  <div className="flex items-center gap-3 sm:gap-5 min-w-0">
-                    <span
-                      className={`text-xs sm:text-sm font-mono font-bold tracking-wider transition-colors duration-200 ${
-                        isOpen ? 'text-[#00FF85]' : 'text-neutral-500 group-hover:text-[#00FF85]'
-                      }`}
-                    >
-                      {String(idx + 1).padStart(2, '0')}
-                    </span>
+                  <div className="flex min-w-0">
                     <span
                       className={`text-base sm:text-lg lg:text-xl font-bold tracking-tight transition-colors duration-200 ${
                         isOpen ? 'text-[#00FF85]' : 'text-white group-hover:text-[#00FF85]'
@@ -137,7 +130,7 @@ export default function HomeFaq() {
                   }}
                 >
                   <div className="overflow-hidden">
-                    <p className="pb-6 pl-7 sm:pl-11 pr-4 sm:pr-8 text-xs sm:text-sm md:text-base leading-relaxed text-neutral-400">
+                    <p className="pb-6 pr-4 text-xs leading-relaxed text-neutral-400 sm:pr-8 sm:text-sm md:text-base">
                       {item.a}
                     </p>
                   </div>

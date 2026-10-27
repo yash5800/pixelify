@@ -12,6 +12,8 @@ import WhyChoosePixelify from './WhyChoosePixelify';
 import HomeFaq from './HomeFaq';
 import Testimonials from "./TestimonialsSection";
 import HomeDemo from './HomeDemo';
+import HomeWorkflowDemos from './HomeWorkflowDemos';
+import HomeVisitorCount from './HomeVisitorCount';
 import '@/styles/home.css';
 interface HomePageProps {
   onLaunchUpscaler: () => void;
@@ -37,7 +39,10 @@ export default function HomePage({
         onLaunchBGRemove={onLaunchBGRemove}
       />
 
-      <div id="home-content" className="flex flex-col gap-10 sm:gap-16 pt-6 sm:pt-12 pb-12 max-w-7xl mx-auto px-3 sm:px-6 relative z-10">
+      <div id="home-content" className="mx-auto flex w-full max-w-[1280px] flex-col gap-10 px-4 pb-12 pt-6 sm:gap-16 sm:px-6 sm:pt-12 lg:px-8 relative z-10">
+
+        <HomeWorkflowDemos onLaunchUpscaler={onLaunchUpscaler}
+          onLaunchBGRemove={onLaunchBGRemove}/>
 
         {/* ========================================================================= */}
         {/* DUAL POPPED WORKSPACE CARDS ("CHOOSE YOUR STUDIO" - reference.mp4 style) */}
@@ -117,6 +122,7 @@ export default function HomePage({
 
       {/* FOOTER */}
       <Footer onTabChange={onTabChange} />
+      <HomeVisitorCount />
     </div>
   );
 }

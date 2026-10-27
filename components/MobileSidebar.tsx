@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { X, Home, Eraser, Sparkles, ChevronRight, Trash2, Link2Off } from 'lucide-react';
+import { X, Home, Eraser, Maximize, ChevronRight, Trash2, ExternalLink, Cpu } from 'lucide-react';
 import type { ViewTab } from '../types';
 import Logo from './Logo';
 import { EngineRow } from './Navbar';
@@ -21,12 +21,13 @@ interface MobileSidebarProps {
   isClearingModelCache?: boolean;
   canClearModelCache?: boolean;
   onClearModelCache?: () => void;
+  isOnline?: boolean;
 }
 
 const NAV_ITEMS: { tab: ViewTab; label: string; Icon: React.ElementType }[] = [
   { tab: 'home', label: 'Home', Icon: Home },
   { tab: 'bg_remove', label: 'BG Remover', Icon: Eraser },
-  { tab: 'upscaler', label: 'AI Upscaler', Icon: Sparkles },
+  { tab: 'upscaler', label: 'AI Upscaler', Icon: Maximize },
 ];
 
 /**
@@ -48,6 +49,7 @@ export default function MobileSidebar({
   isClearingModelCache = false,
   canClearModelCache = true,
   onClearModelCache,
+  isOnline = true,
 }: MobileSidebarProps) {
   // Close on Escape while open
   useEffect(() => {
@@ -81,35 +83,33 @@ export default function MobileSidebar({
       <aside className="animate-slide-in-left absolute left-0 top-0 flex h-full w-[300px] max-w-[85vw] flex-col overflow-y-auto rounded-r-2xl border-r border-white/10 bg-[#0A0A0C] shadow-[0_0_60px_rgba(0,0,0,0.9)]">
 
         {/* HEADER: PIXELIFY LOGO + CLOSE */}
-        <div className="flex items-center justify-between px-4 pt-5 pb-4">
+        <div className="flex items-center justify-between px-4 pt-5 pb-3.5">
           <button
             type="button"
             onClick={() => go('home')}
             className="flex cursor-pointer items-center bg-transparent p-0 transition-transform duration-200 active:scale-95"
             aria-label="Go to home"
           >
-            <Logo size="sm" className="origin-left scale-[0.60]" />
+            <Logo size="xs" />
           </button>
 
           <button
             type="button"
             onClick={onClose}
             aria-label="Close menu"
-            className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-white/5 hover:text-neutral-300"
+            className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-neutral-400 transition-colors hover:bg-white/[0.08] hover:text-white active:scale-95"
           >
-            <X size={30} />
+            <X size={18} />
           </button>
         </div>
 
-        <div className="mx-4 border-t border-white/[0.08]" />
-
         {/* SECTION LABEL */}
-        <span className="px-4 pb-1 pt-5 text-[13px] font-medium text-neutral-400">
+        <span className="px-4 pb-1 pt-4 text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-500">
           Platform
         </span>
 
         {/* NAV LINKS (flat rows: icon + label + right chevron) */}
-        <nav className="flex flex-col gap-0.5 px-2" aria-label="Mobile sidebar navigation">
+        <nav className="flex flex-col gap-1 px-3" aria-label="Mobile sidebar navigation">
           {NAV_ITEMS.map(({ tab, label, Icon }) => {
             const isActive = activeTab === tab;
             return (
@@ -117,10 +117,10 @@ export default function MobileSidebar({
                 key={tab}
                 type="button"
                 onClick={() => go(tab)}
-                className={`group flex w-full cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2.5 text-[15px] transition-colors ${
+                className={`group flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] transition-all ${
                   isActive
-                    ? 'bg-white/[0.08] font-semibold text-white'
-                    : 'font-medium text-neutral-300 hover:bg-white/[0.04] hover:text-white'
+                    ? 'bg-white/[0.1] font-semibold text-white shadow-sm border border-white/10'
+                    : 'font-medium text-neutral-300 hover:bg-white/[0.04] hover:text-white border border-transparent'
                 }`}
               >
                 <Icon
@@ -130,8 +130,8 @@ export default function MobileSidebar({
                 />
                 <span className="flex-1 text-left">{label}</span>
                 <ChevronRight
-                  size={16}
-                  className={isActive ? 'text-neutral-300' : 'text-neutral-500'}
+                  size={15}
+                  className={isActive ? 'text-neutral-300' : 'text-neutral-500 group-hover:text-neutral-400'}
                 />
               </button>
             );
@@ -139,11 +139,13 @@ export default function MobileSidebar({
         </nav>
 
         {/* FOOTER: ENGINE STATUS & SETTINGS */}
-        <div className="mt-auto flex flex-col gap-2.5 border-t border-white/[0.08] px-4 pb-6 pt-4">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
-            Engines & Settings
-          </span>
-          <div className="flex flex-col gap-1.5">
+        <div className="mt-auto flex flex-col gap-2.5 border-t border-white/[0.08] px-4 pb-8 pt-4">
+          <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-500">
+            <Cpu size={12} className="text-violet-300/80" />
+            <span>Engines & Settings</span>
+          </div>
+          <div className="flex flex-col gap-1.5 rounded-xl border border-white/[0.07] bg-black/25 px-2.5 py-2">
+            
             <EngineRow label="AI Upscaler engine" engine={upscalerEngine} />
             <EngineRow label="BG Remover engine" engine={bgEngine} />
             {webgpuAvailable !== undefined && (
@@ -169,29 +171,31 @@ export default function MobileSidebar({
           </div>
 
           {modelStatus && (
-            <p className="px-0.5 text-[10px] leading-relaxed text-neutral-500">
+            <p className="px-0.5 text-[9.5px] leading-relaxed text-neutral-500">
               {modelStatus}
             </p>
           )}
 
           {onClearModelCache && (
-            <div className="border-t border-white/10 pt-2.5">
+            <div className="flex flex-col gap-1.5 pt-2.5">
               <button
                 type="button"
                 onClick={onClearModelCache}
                 disabled={isClearingModelCache || !canClearModelCache}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] font-semibold text-neutral-300 transition-colors hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-40 active:scale-[0.98]"
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-[11px] font-semibold text-neutral-300 transition-colors hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-40 active:scale-[0.98]"
                 title="Remove downloaded AI models from this browser"
               >
-                <Trash2 size={14} className={isClearingModelCache ? 'animate-pulse' : ''} />
-                {isClearingModelCache ? 'Clearing models…' : 'Clear downloaded models'}
+                <Trash2 size={13} className={isClearingModelCache ? 'animate-pulse text-white/50' : 'text-white/50'} />
+                <span>{isClearingModelCache ? 'Clearing models…' : 'Clear downloaded models'}</span>
               </button>
               <Link
                 href={"/blogs/enable_webgpu_guide_b5c9e8"}
                 onClick={onClose}
-                className="mt-1.5 block px-0.5 text-[10px] font-medium text-[#00FF85] hover:text-[#00FF85]/80 hover:underline transition-colors leading-relaxed"
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-violet-400/20 bg-violet-400/[0.07] px-3 py-2.5 text-[11px] font-medium text-violet-200 transition-colors hover:bg-violet-400/[0.14] hover:text-violet-100 active:scale-[0.98]"
+                title="Learn how to enable WebGPU in your browser"
               >
-                Learn how to enable webGPU on your browser!
+                <ExternalLink size={13} className="shrink-0 text-violet-300" />
+                <span>Learn about WebGPU</span>
               </Link>
             </div>
           )}

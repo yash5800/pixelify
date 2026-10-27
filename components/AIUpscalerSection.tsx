@@ -182,7 +182,7 @@ export default function AIUpscalerSection({ onLaunchUpscaler }: AIUpscalerSectio
     }, []);
 
     return (
-        <section ref={sectionRef} className="w-screen max-w-[100vw] relative left-1/2 -translate-x-1/2 pt-10 sm:pt-16 lg:pt-160 pb-20 sm:pb-24 lg:pb-32 px-4 sm:px-6 lg:px-12 overflow-hidden">
+        <section ref={sectionRef} className="w-full pt-10 sm:pt-16 lg:pt-160 pb-20 sm:pb-24 lg:pb-32 overflow-hidden">
             {/* The card stage is visually scaled (0.58–1.0) but a transform never
                 shrinks its layout box, which used to leave ~90px of dead air above
                 and below the cards on phones. These margins subtract the invisible

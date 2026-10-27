@@ -19,6 +19,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@emailjs/browser": "^5.0.3",
     "@react-three/drei": "^9.122.0",
     "@react-three/fiber": "^8.18.0",
     "fabric": "^6.7.1",

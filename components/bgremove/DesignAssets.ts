@@ -6,13 +6,27 @@ export interface TextLayer {
   text: string;
   x: number; // percentage 0 - 100
   y: number; // percentage 0 - 100
-  fontSize: number; // px at standard scale
+  fontSize: number; // px at standard scale (1 - 1000)
   fontFamily: string;
   fontWeight: 'normal' | '600' | 'bold' | '900';
+  italic?: boolean;
+  underline?: boolean;
+  letterSpacing?: number; // px
+  lineHeight?: number; // multiplier e.g. 1.25
+  uppercase?: boolean;
   color: string;
   align: 'left' | 'center' | 'right';
-  bgPill?: 'none' | 'black' | 'mint' | 'white' | 'crimson';
+  bgPill?: 'none' | 'black' | 'mint' | 'white' | 'crimson' | 'sky' | 'amber';
   shadow?: boolean;
+  glow?: boolean;
+}
+
+export interface FontPreset {
+  id: string;
+  label: string;
+  category: 'sans' | 'serif' | 'display' | 'script' | 'mono' | 'custom';
+  css: string;
+  isCustom?: boolean;
 }
 
 export interface ElementLayer {
@@ -41,13 +55,44 @@ export interface ElementPreset {
   path?: string; // SVG path d (viewBox 0 0 24 24)
 }
 
-export const FONT_FAMILIES = [
-  { id: 'Plus Jakarta Sans', label: 'Plus Jakarta (Modern)', css: "'Plus Jakarta Sans', sans-serif" },
-  { id: 'Inter', label: 'Inter (Clean)', css: "'Inter', sans-serif" },
-  { id: 'Playfair Display', label: 'Playfair (Luxury Serif)', css: "'Playfair Display', serif" },
-  { id: 'Impact', label: 'Impact (Bold Headline)', css: "Impact, 'Arial Black', sans-serif" },
-  { id: 'Outfit', label: 'Outfit (Geometric)', css: "'Outfit', sans-serif" },
-  { id: 'Courier New', label: 'Courier (Monospace)', css: "'Courier New', monospace" },
+export const FONT_FAMILIES: FontPreset[] = [
+  // --- MODERN SANS ---
+  { id: 'Plus Jakarta Sans', label: 'Plus Jakarta Sans', category: 'sans', css: "'Plus Jakarta Sans', sans-serif" },
+  { id: 'Inter', label: 'Inter', category: 'sans', css: "'Inter', sans-serif" },
+  { id: 'Outfit', label: 'Outfit', category: 'sans', css: "'Outfit', sans-serif" },
+  { id: 'Montserrat', label: 'Montserrat', category: 'sans', css: "'Montserrat', sans-serif" },
+  { id: 'Poppins', label: 'Poppins', category: 'sans', css: "'Poppins', sans-serif" },
+  { id: 'Space Grotesk', label: 'Space Grotesk', category: 'sans', css: "'Space Grotesk', sans-serif" },
+  { id: 'Syne', label: 'Syne', category: 'sans', css: "'Syne', sans-serif" },
+  { id: 'Lexend', label: 'Lexend', category: 'sans', css: "'Lexend', sans-serif" },
+
+  // --- LUXURY & EDITORIAL SERIF ---
+  { id: 'Playfair Display', label: 'Playfair Display', category: 'serif', css: "'Playfair Display', serif" },
+  { id: 'Cinzel', label: 'Cinzel', category: 'serif', css: "'Cinzel', serif" },
+  { id: 'Cormorant Garamond', label: 'Cormorant Garamond', category: 'serif', css: "'Cormorant Garamond', serif" },
+  { id: 'Merriweather', label: 'Merriweather', category: 'serif', css: "'Merriweather', serif" },
+  { id: 'DM Serif Display', label: 'DM Serif Display', category: 'serif', css: "'DM Serif Display', serif" },
+
+  // --- BOLD & DISPLAY HEADLINE ---
+  { id: 'Bebas Neue', label: 'Bebas Neue', category: 'display', css: "'Bebas Neue', Impact, sans-serif" },
+  { id: 'Anton', label: 'Anton', category: 'display', css: "'Anton', sans-serif" },
+  { id: 'Impact', label: 'Impact', category: 'display', css: "Impact, 'Arial Black', sans-serif" },
+  { id: 'Righteous', label: 'Righteous', category: 'display', css: "'Righteous', cursive" },
+  { id: 'Bungee', label: 'Bungee', category: 'display', css: "'Bungee', cursive" },
+  { id: 'Russo One', label: 'Russo One', category: 'display', css: "'Russo One', sans-serif" },
+  { id: 'Orbitron', label: 'Orbitron', category: 'display', css: "'Orbitron', sans-serif" },
+
+  // --- SCRIPT & HANDWRITING ---
+  { id: 'Pacifico', label: 'Pacifico', category: 'script', css: "'Pacifico', cursive" },
+  { id: 'Dancing Script', label: 'Dancing Script', category: 'script', css: "'Dancing Script', cursive" },
+  { id: 'Caveat', label: 'Caveat', category: 'script', css: "'Caveat', cursive" },
+  { id: 'Satisfy', label: 'Satisfy', category: 'script', css: "'Satisfy', cursive" },
+
+  // --- DEVELOPER MONOSPACE ---
+  { id: 'JetBrains Mono', label: 'JetBrains Mono', category: 'mono', css: "'JetBrains Mono', monospace" },
+  { id: 'Space Mono', label: 'Space Mono', category: 'mono', css: "'Space Mono', monospace" },
+  { id: 'Fira Code', label: 'Fira Code', category: 'mono', css: "'Fira Code', monospace" },
+  { id: 'Courier New', label: 'Courier New', category: 'mono', css: "'Courier New', monospace" },
 ];
 
 export const COLOR_PALETTE = [
@@ -274,23 +319,28 @@ export function drawRoundRect(
 }
 
 /**
- * Renders all design text and element layers onto a target canvas 2D context
+ * Renders all design text and element layers onto a target canvas 2D context.
+ * Uses baseWidth (the preview artboard width) to scale all dimensions identically
+ * to how they appeared on the screen preview.
  */
 export function renderDesignLayersToCanvas(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
   textLayers: TextLayer[],
-  elementLayers: ElementLayer[]
+  elementLayers: ElementLayer[],
+  baseWidth?: number
 ) {
+  // If baseWidth is provided, scale is strictly width / baseWidth.
+  // Otherwise fall back to base 800 standard.
+  const scale = baseWidth && baseWidth > 0 ? width / baseWidth : Math.max(0.5, width / 800);
+
   // 1. RENDER ELEMENT LAYERS
   elementLayers.forEach((el) => {
     ctx.save();
     const pixelX = (el.x / 100) * width;
     const pixelY = (el.y / 100) * height;
-    // Scale element proportionally to image canvas size (base standard 800px)
-    const scaleFactor = Math.max(1, Math.min(width, height) / 800);
-    const pixelSize = el.size * scaleFactor;
+    const pixelSize = el.size * scale;
 
     ctx.translate(pixelX, pixelY);
     if (el.rotation) {
@@ -301,19 +351,19 @@ export function renderDesignLayersToCanvas(
     if (el.type === 'badge') {
       // Draw badge pill
       const text = el.badgeText || el.name;
-      const fontSize = Math.round(18 * scaleFactor);
+      const fontSize = Math.round(el.size * 0.22 * scale);
       ctx.font = `900 ${fontSize}px 'Plus Jakarta Sans', sans-serif`;
       const textWidth = ctx.measureText(text).width;
-      const padX = 18 * scaleFactor;
-      const padY = 10 * scaleFactor;
+      const padX = 16 * scale;
+      const padY = 8 * scale;
       const pillW = textWidth + padX * 2;
       const pillH = fontSize + padY * 2;
       const radius = pillH / 2;
 
       // Outer glow / shadow
-      ctx.shadowColor = el.color;
-      ctx.shadowBlur = 16 * scaleFactor;
-      ctx.shadowOffsetY = 4 * scaleFactor;
+      ctx.shadowColor = el.color + '66';
+      ctx.shadowBlur = 20 * scale;
+      ctx.shadowOffsetY = 0;
 
       // Badge background
       ctx.fillStyle = '#09090D';
@@ -322,7 +372,7 @@ export function renderDesignLayersToCanvas(
 
       // Badge border
       ctx.shadowBlur = 0;
-      ctx.lineWidth = 3 * scaleFactor;
+      ctx.lineWidth = Math.max(1, Math.round(2 * scale));
       ctx.strokeStyle = el.color;
       ctx.stroke();
 
@@ -330,18 +380,18 @@ export function renderDesignLayersToCanvas(
       ctx.fillStyle = el.color;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(text, 0, 1 * scaleFactor);
+      ctx.fillText(text, 0, 1 * scale);
     } else {
       // Draw shape / sticker from SVG path
       const preset = ELEMENT_PRESETS.find((p) => p.key === el.key);
       if (preset?.path) {
-        ctx.shadowColor = 'rgba(0,0,0,0.4)';
-        ctx.shadowBlur = 10 * scaleFactor;
-        ctx.shadowOffsetY = 4 * scaleFactor;
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = 10 * scale;
+        ctx.shadowOffsetY = 4 * scale;
 
         // Path is in 24x24 box
-        const scale = pixelSize / 24;
-        ctx.scale(scale, scale);
+        const pathScale = pixelSize / 24;
+        ctx.scale(pathScale, pathScale);
         ctx.translate(-12, -12); // Center path around 0,0
 
         const path2d = new Path2D(preset.path);
@@ -357,48 +407,105 @@ export function renderDesignLayersToCanvas(
     ctx.save();
     const pixelX = (tl.x / 100) * width;
     const pixelY = (tl.y / 100) * height;
-    const scaleFactor = Math.max(1, Math.min(width, height) / 800);
-    const scaledFontSize = Math.round(tl.fontSize * scaleFactor);
+    const scaledFontSize = Math.round(tl.fontSize * scale);
 
-    ctx.font = `${tl.fontWeight || 'bold'} ${scaledFontSize}px ${tl.fontFamily || 'Plus Jakarta Sans'}, sans-serif`;
-    ctx.textAlign = tl.align || 'center';
-    ctx.textBaseline = 'middle';
+    const fontFamily = tl.fontFamily?.trim() || 'Plus Jakarta Sans';
+    const matchedFont = FONT_FAMILIES.find((f) => f.id === tl.fontFamily);
+    const fontCss = matchedFont ? matchedFont.css : `'${fontFamily}', sans-serif`;
+    const fontStyle = tl.italic ? 'italic ' : '';
+    const fontWeight = tl.fontWeight || 'bold';
+    ctx.font = `${fontStyle}${fontWeight} ${scaledFontSize}px ${fontCss}`;
 
-    const textMetrics = ctx.measureText(tl.text);
-    const textWidth = textMetrics.width;
-    const textHeight = scaledFontSize;
+    if (tl.letterSpacing && 'letterSpacing' in ctx) {
+      (ctx as any).letterSpacing = `${tl.letterSpacing * scale}px`;
+    }
+
+    const textToRender = tl.uppercase ? tl.text.toUpperCase() : tl.text;
+    const lines = textToRender.split('\n');
+    const lineMultiplier = tl.lineHeight || 1.25;
+    const lineHeight = scaledFontSize * lineMultiplier;
+    const totalTextHeight = lines.length * lineHeight;
+
+    let maxLineWidth = 0;
+    lines.forEach((line) => {
+      const w = ctx.measureText(line).width;
+      if (w > maxLineWidth) maxLineWidth = w;
+    });
+
+    const padX = 12 * scale;
+    const padY = 4 * scale;
+    const pillW = maxLineWidth + padX * 2;
+    const pillH = totalTextHeight + padY * 2;
+    const radius = Math.min(pillH / 2, 12 * scale);
 
     // Optional background pill
     if (tl.bgPill && tl.bgPill !== 'none') {
       ctx.save();
-      const padX = 16 * scaleFactor;
-      const padY = 8 * scaleFactor;
-      const pillW = textWidth + padX * 2;
-      const pillH = textHeight + padY * 2;
-      let left = pixelX - pillW / 2;
-      if (tl.align === 'left') left = pixelX - padX;
-      if (tl.align === 'right') left = pixelX - pillW + padX;
-
       let pillColor = 'rgba(9, 9, 13, 0.85)';
       if (tl.bgPill === 'mint') pillColor = '#00FF85';
       if (tl.bgPill === 'white') pillColor = '#FFFFFF';
       if (tl.bgPill === 'crimson') pillColor = '#F43F5E';
+      if (tl.bgPill === 'sky') pillColor = '#38BDF8';
+      if (tl.bgPill === 'amber') pillColor = '#F59E0B';
+      if (tl.bgPill === 'black') pillColor = 'rgba(9, 9, 13, 0.85)';
 
       ctx.fillStyle = pillColor;
-      drawRoundRect(ctx, left, pixelY - pillH / 2, pillW, pillH, 12 * scaleFactor);
+      drawRoundRect(ctx, pixelX - pillW / 2, pixelY - pillH / 2, pillW, pillH, radius);
       ctx.fill();
       ctx.restore();
     }
 
-    // Shadow
-    if (tl.shadow) {
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-      ctx.shadowBlur = 12 * scaleFactor;
-      ctx.shadowOffsetY = 4 * scaleFactor;
+    // Glow or Shadow
+    if (tl.glow) {
+      ctx.shadowColor = tl.color || '#00FF85';
+      ctx.shadowBlur = 24 * scale;
+      ctx.shadowOffsetY = 0;
+    } else if (tl.shadow) {
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+      ctx.shadowBlur = 14 * scale;
+      ctx.shadowOffsetY = 4 * scale;
     }
 
     ctx.fillStyle = tl.color || '#FFFFFF';
-    ctx.fillText(tl.text, pixelX, pixelY);
+    ctx.textBaseline = 'middle';
+
+    // Draw each line so that overall block is centered at (pixelX, pixelY)
+    lines.forEach((line, i) => {
+      const lineY = pixelY - totalTextHeight / 2 + (i + 0.5) * lineHeight;
+      const lineWidth = ctx.measureText(line).width;
+      let lineX = pixelX;
+
+      if (tl.align === 'left') {
+        ctx.textAlign = 'left';
+        lineX = pixelX - maxLineWidth / 2;
+        ctx.fillText(line, lineX, lineY);
+      } else if (tl.align === 'right') {
+        ctx.textAlign = 'right';
+        lineX = pixelX + maxLineWidth / 2;
+        ctx.fillText(line, lineX, lineY);
+      } else {
+        ctx.textAlign = 'center';
+        lineX = pixelX;
+        ctx.fillText(line, lineX, lineY);
+      }
+
+      // Underline support
+      if (tl.underline) {
+        ctx.save();
+        ctx.fillStyle = tl.color || '#FFFFFF';
+        const underlineThickness = Math.max(1, Math.round(scaledFontSize * 0.07));
+        const underlineY = lineY + scaledFontSize * 0.45;
+        let underlineStartX = lineX;
+        if (tl.align === 'center') {
+          underlineStartX = lineX - lineWidth / 2;
+        } else if (tl.align === 'right') {
+          underlineStartX = lineX - lineWidth;
+        }
+        ctx.fillRect(underlineStartX, underlineY, lineWidth, underlineThickness);
+        ctx.restore();
+      }
+    });
+
     ctx.restore();
   });
 }

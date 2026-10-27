@@ -5,7 +5,7 @@ import BlogListView from '@/components/BlogListView';
 export const metadata: Metadata = {
   title: 'Blog & AI Guides: On-Device AI, Privacy & Upscaling | Pixelify',
   description:
-    'In-depth articles about local AI, privacy, background removal, upscaling, WebGPU and how the site runs everything on-device: no cloud, no uploads, no tracking.',
+    'In-depth articles about local AI, privacy, background removal, upscaling, WebGPU and how the site runs image processing on-device: no cloud uploads or cross-site tracking.',
   alternates: { canonical: '/blogs/' },
   openGraph: {
     title: 'Blog & Guides · Pixelify',

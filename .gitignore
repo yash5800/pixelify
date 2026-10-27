@@ -8,3 +8,9 @@ out/
 # accidental copies / local junk
 .git copy/
 .freebuff/
+
+# environment variables
+.env
+.env*.local
+
+/public/litert/

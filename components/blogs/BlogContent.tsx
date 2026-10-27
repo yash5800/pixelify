@@ -1,6 +1,7 @@
 import React from 'react';
 import type { Block } from '../../data/posts';
 import { getBlogImageDims } from '../../lib/imageDims';
+import { renderHeadingWithBrowserIcons } from './BrowserIcons';
 
 interface BlogContentProps {
   blocks: Block[];
@@ -24,15 +25,19 @@ export default function BlogContent({ blocks }: BlogContentProps) {
               </p>
             );
 
-          case 'h2':
+          case 'h2': {
             return (
               <React.Fragment key={idx}>
                 <hr className="mt-12 mb-8 border-0 border-t border-white/15" />
-                <h2 id={`heading-${idx}`} className="mb-7 scroll-mt-28 text-[26px] font-bold leading-[1.3] tracking-[-0.01em] text-white sm:mb-10 sm:text-[30px]">
-                  {block.text}
+                <h2
+                  id={`heading-${idx}`}
+                  className="mb-7 scroll-mt-28 text-[26px] font-bold leading-[1.3] tracking-[-0.01em] text-white sm:mb-10 sm:text-[30px]"
+                >
+                  {renderHeadingWithBrowserIcons(block.text, block.icons || (block.icon ? [block.icon] : undefined))}
                 </h2>
               </React.Fragment>
             );
+          }
 
           case 'h3':
             return (

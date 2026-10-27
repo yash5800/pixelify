@@ -107,7 +107,6 @@ export const UpscaleFaq: React.FC = () => {
                   aria-expanded={isOpen}
                   onClick={() => setOpenIdx(isOpen ? null : idx)}
                 >
-                  <span className="uc-faq-num">{String(idx + 1).padStart(2, '0')}</span>
                   <span className="uc-faq-qtext">{item.q}</span>
                   <span className="uc-faq-plus" aria-hidden="true">
                     <Plus size={16} strokeWidth={2.4} />

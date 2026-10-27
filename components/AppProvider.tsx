@@ -13,6 +13,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import Navbar from './Navbar';
 import MobileSidebar from './MobileSidebar';
 import CookieNotice from './CookieNotice';
+import OfflineNoticeBanner from './OfflineNoticeBanner';
 
 import type {
   Step,
@@ -96,7 +97,9 @@ interface AppContextValue {
   canClearModelCache: boolean;
   onClearModelCache: () => Promise<void>;
   onOpenMobileSidebar: () => void;
+  isMobileSidebarOpen: boolean;
   mobileHidden: boolean;
+  isOnline: boolean;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -231,6 +234,91 @@ export default function AppProvider({ children }: { children: React.ReactNode })
   const [step, setStep] = useState<Step>('upload');
   const [items, setItems] = useState<UpscaleItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Network connection state (Offline / Online detection)
+  const [isOnline, setIsOnline] = useState<boolean>(() => {
+    if (typeof navigator !== 'undefined') {
+      return navigator.onLine;
+    }
+    return true;
+  });
+  const [justReconnected, setJustReconnected] = useState(false);
+  const [isOfflineBannerOpen, setIsOfflineBannerOpen] = useState(false);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+
+    const handleOnline = () => {
+      setIsOnline(true);
+      setJustReconnected(true);
+      timer = setTimeout(() => {
+        setJustReconnected(false);
+      }, 4000);
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      setIsOfflineBannerOpen(true);
+      setJustReconnected(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setIsOnline(false);
+      setIsOfflineBannerOpen(true);
+    }
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
+
+  // Service Worker registration & Route prefetching for offline resilience
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+      navigator.serviceWorker.register('/sw.js').catch((err) => {
+        console.debug('ServiceWorker registration skipped or failed:', err);
+      });
+    }
+
+    try {
+      router.prefetch('/');
+      router.prefetch('/upscaler');
+      router.prefetch('/bg_remove');
+    } catch {
+      // prefetch silently handled
+    }
+  }, [router]);
+
+  // Canva-style Unsaved Changes Confirmation on reload or tab close
+  const hasUnsavedWork = useMemo(() => {
+    const hasUpscalerItems = items.length > 0;
+    const isUpscaling = items.some((i) => i.status === 'processing');
+    const hasBgJobs = bgJobs.length > 0;
+    const isBgProcessing = bgJobs.some((j) => j.status === 'loading' || j.status === 'processing');
+
+    return hasUpscalerItems || isUpscaling || hasBgJobs || isBgProcessing;
+  }, [items, bgJobs]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedWork) {
+        e.preventDefault();
+        // Modern standard for browser native "Reload site? Changes you made may not be saved." prompt
+        e.returnValue = '';
+        return '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [hasUnsavedWork]);
 
   // AI Enhancement options defaults
   const DEFAULT_OPTIONS: EnhancementOptions = {
@@ -947,7 +1035,9 @@ const setActiveUpscalerModel = (key: ModelKey) => {
     canClearModelCache,
     onClearModelCache: handleClearModelCache,
     onOpenMobileSidebar,
+    isMobileSidebarOpen: isMobileNavOpen,
     mobileHidden,
+    isOnline,
   };
 
   return (
@@ -989,7 +1079,10 @@ const setActiveUpscalerModel = (key: ModelKey) => {
           canClearModelCache={canClearModelCache}
           onClearModelCache={handleClearModelCache}
           onOpenMobileSidebar={onOpenMobileSidebar}
+          isMobileSidebarOpen={isMobileNavOpen}
           mobileHidden={mobileHidden}
+          isOnline={isOnline}
+          justReconnected={justReconnected}
         />
 
         {/* MOBILE NAVIGATION SIDEBAR (replaces the old bottom nav on < md) */}
@@ -1008,6 +1101,7 @@ const setActiveUpscalerModel = (key: ModelKey) => {
           isClearingModelCache={isClearingModelCache}
           canClearModelCache={canClearModelCache}
           onClearModelCache={handleClearModelCache}
+          isOnline={isOnline}
         />
 
         {/* MAIN CONTENT AREA */}
@@ -1015,10 +1109,21 @@ const setActiveUpscalerModel = (key: ModelKey) => {
           {children}
         </main>
 
-        <ScrollToTopButton />
+        {/* SCROLL TO TOP — Only for browsing pages (Home, Blogs), STOPPED on editing workspaces where it blocks design features */}
+        {activeTab !== 'bg_remove' && (activeTab !== 'upscaler' || step === 'upload') && (
+          <ScrollToTopButton />
+        )}
 
         {/* COOKIE NOTICE (bottom sheet, until "Done") */}
         <CookieNotice />
+
+        {/* OFFLINE / RECONNECTED NOTIFICATION BANNER */}
+        <OfflineNoticeBanner
+          isOnline={isOnline}
+          justReconnected={justReconnected}
+          isOpen={isOfflineBannerOpen}
+          onDismiss={() => setIsOfflineBannerOpen(false)}
+        />
       </div>
     </AppContext.Provider>
   );

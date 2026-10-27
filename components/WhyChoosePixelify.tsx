@@ -82,14 +82,14 @@ function FeatureCard({
 export default function WhyChoosePixelify() {
   return (
     <section
-      className="pixelify-why-section w-screen max-w-[100vw] relative left-1/2 -translate-x-1/2 overflow-hidden"
+      className="pixelify-why-section w-full overflow-hidden"
       aria-labelledby="why-pixelify-title"
     >
       <div className="pixelify-why-shell relative isolate w-full overflow-hidden rounded-[28px] sm:rounded-[44px] border border-white/10 shadow-[0_30px_100px_rgba(0,0,0,0.7)]">
         <div className="pixelify-why-glow pixelify-why-glow-one" aria-hidden="true" />
         <div className="pixelify-why-glow pixelify-why-glow-two" aria-hidden="true" />
 
-        <div className="pixelify-why-content relative z-10 mx-auto max-w-7xl px-4 py-14 sm:px-7 sm:py-18 lg:px-10 lg:py-24">
+        <div className="pixelify-why-content relative z-10 mx-auto w-full px-0 py-14 sm:py-18 lg:py-24">
           <motion.header
             className="mx-auto mb-10 max-w-3xl text-center sm:mb-14"
             initial={{ opacity: 0, y: 20 }}

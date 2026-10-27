@@ -3,8 +3,8 @@
 /* Full-viewport section breakout: backgrounds reach both edges of the device. */
 .pixelify-why-section {
   position: relative;
-  width: 100vw;
-  max-width: 100vw;
+  width: 100%;
+  max-width: 100%;
   margin: 0;
   padding: 0;
 }
@@ -258,8 +258,8 @@
 /* White rounded testimonial panel, separated clearly from the dark section above. */
 .pixelify-testimonials-wrap {
   position: relative;
-  width: 100vw;
-  max-width: 100vw;
+  width: 100%;
+  max-width: 100%;
   margin: 0;
   padding: 0;
   background: transparent;
@@ -282,7 +282,6 @@
 .pixelify-testimonial-track { scrollbar-width: none; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scroll-snap-type: x mandatory; padding-right: 1px; }
 .pixelify-testimonial-card { width: 30%; min-width: 320px; min-height: 330px; scroll-snap-align: start; border: 1px solid #e9ece9; border-radius: 22px; padding: 24px; background: #fff; box-shadow: 0 8px 28px rgba(20, 30, 24, 0.035); transition: border-color 180ms ease, box-shadow 180ms ease; }
 .pixelify-testimonial-card:hover { border-color: #ccefdc; box-shadow: 0 14px 36px rgba(20, 30, 24, 0.07); }
-.pixelify-testimonial-fade { position: absolute; top: 0; right: 0; bottom: 0; width: clamp(46px, 8%, 112px); pointer-events: none; background: linear-gradient(90deg, rgba(255, 255, 255, 0), #fff 92%); }
 
 @media (max-width: 1023px) {
   .pixelify-feature-card { min-height: 255px; }
@@ -297,8 +296,7 @@
   .pixelify-feature-tag, .pixelify-feature-badge { font-size: 8px; padding: 5px 7px; }
   .pixelify-feature-arrow { opacity: 0.8; transform: none; }
   .pixelify-feature-visual { margin-top: 16px; padding-top: 14px; }
-  .pixelify-testimonial-card { width: 86%; min-height: 320px; padding: 21px; }
-  .pixelify-testimonial-fade { width: 34px; }
+  .pixelify-testimonial-card { width: 86%; min-height: 320px; padding: 21px; scroll-snap-align: center; }
   .pixelify-carousel-arrow { width: 42px; height: 42px; }
 }
 

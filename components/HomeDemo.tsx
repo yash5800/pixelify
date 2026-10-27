@@ -101,14 +101,10 @@ export default function HomeDemo({
   return (
     <section
       className="
-        relative left-1/2 z-20
-        my-6 w-screen max-w-[100vw]
-        -translate-x-1/2
+        relative z-20
+        my-6 w-full
         overflow-visible
-        px-3
-        sm:my-10 sm:px-6
-        lg:px-8
-        xl:px-10
+        sm:my-10
       "
     >
       {/* FULL-WIDTH SECTION CONTENT */}

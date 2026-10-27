@@ -14,6 +14,12 @@ const BLOG_IMAGE_DIMS: Record<string, readonly [number, number]> = {
   '/blogs/story-page.jpg': [1600, 1000],
   '/blogs/upscaler-page.jpg': [1600, 1000],
   '/blogs/upscaler-sections.jpg': [1600, 1000],
+  '/blogs/how-to-webgpu-chrome.png': [1110, 675],
+  '/blogs/chrome.webp': [256, 256],
+  '/blogs/microsoft-edge.webp': [512, 512],
+  '/blogs/firefox.png': [256, 256],
+  '/blogs/brave-browser-icon.webp': [256, 256],
+  '/blogs/safari.png': [512, 512],
 };
 
 export function getBlogImageDims(src: string): { width: number; height: number } | undefined {

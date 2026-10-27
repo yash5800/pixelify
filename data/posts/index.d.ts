@@ -1,6 +1,6 @@
 export type Block =
   | { type: 'p'; text: string }
-  | { type: 'h2' | 'h3'; text: string }
+  | { type: 'h2' | 'h3'; text: string; icon?: string; icons?: string[] }
   | { type: 'img'; src: string; alt: string; caption?: string }
   | { type: 'ul' | 'ol'; items: string[] }
   | { type: 'quote'; text: string; cite?: string }

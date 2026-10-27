@@ -133,24 +133,150 @@ export const POSTS_EN = [
         title: 'Where to look',
         text: 'Settings (gear icon) → engine badges. Each tool reports its own live engine, read back from the runtime rather than assumed, so the badge reflects reality, not feature detection optimism.',
       },
-      { type: 'h2', text: 'Chrome and Edge on desktop' },
+      { type: 'h2', text: 'Chrome and Microsoft Edge', icons: ['chrome', 'edge'] },
       {
         type: 'p',
-        text: 'Recent Chrome and Edge releases enable WebGPU by default on most desktop hardware. If the badge still shows a CPU fallback, the flag is the next stop. Navigate to the browser\'s experimental features page (the address is chrome://flags on both browsers), search for "WebGPU," and switch the entry from Default to Enabled, then relaunch when prompted. On Linux, an additional launch parameter historically gated availability; on Windows and macOS a relaunch is usually all that is required.',
+        text: 'If your browser is using a CPU fallback instead of GPU acceleration, enabling the appropriate WebGPU flag may help resolve the issue. Follow the steps below to check and configure WebGPU in Google Chrome or Microsoft Edge.',
+      },
+      {
+        type: 'img',
+        src: '/blogs/how-to-webgpu-chrome.png',
+        alt: 'Enabling WebGPU flags in Google Chrome and Microsoft Edge',
+        caption: 'Search for "WebGPU" in chrome://flags or edge://flags and enable the flag.',
+      },
+      { type: 'h3', text: 'Step 1: Open the Browser Flags Page' },
+      {
+        type: 'p',
+        text: 'Launch Google Chrome or Microsoft Edge on your desktop. Click the address bar, type chrome://flags in Chrome or edge://flags in Microsoft Edge, and press Enter to access the experimental features page.',
+      },
+      { type: 'h3', text: 'Step 2: Search for WebGPU' },
+      {
+        type: 'p',
+        text: 'Once the Experiments page opens, locate the search box at the top. Type WebGPU to filter the available experimental settings and find the relevant WebGPU flags.',
+      },
+      { type: 'h3', text: 'Step 3: Enable the WebGPU Flag' },
+      {
+        type: 'p',
+        text: 'Find the Force enable WebGPU interop option, as shown in the screenshot. Click the dropdown menu next to it and select Enabled instead of Default.',
       },
       {
         type: 'p',
-        text: 'If enabling the flag does not flip the badge, the cause is below the browser: the graphics driver. WebGPU requires reasonably current drivers, and laptop users should check that the browser is running on the dedicated GPU rather than the integrated one; many machines default browsers to power saving, which quietly limits compute capability. Both the browser\'s own GPU diagnostics page and the operating system\'s graphics settings expose this.',
+        text: 'This flag is primarily relevant to specific graphics configurations, particularly Vulkan-based configurations on Linux. If the option is unavailable or does not apply to your system, do not assume that enabling it is necessary for WebGPU to work.',
       },
-      { type: 'h2', text: 'Firefox' },
+      { type: 'h3', text: 'Step 4: Relaunch the Browser' },
       {
         type: 'p',
-        text: 'Firefox ships WebGPU support in current releases, enabled by default on major platforms. On older releases it sits behind the same flags mechanism: open the experimental configuration page (about:config), search for the WebGPU entries, and enable them individually. Firefox has historically been the most conservative shipper of the feature, so keeping the browser updated matters more here than anywhere else; each release meaningfully widens hardware support.',
+        text: 'After changing the flag, click Relaunch if the browser displays the option. This restarts the browser and applies the updated experimental setting. Save any unfinished work before restarting.',
       },
-      { type: 'h2', text: 'Safari on macOS' },
+      { type: 'h3', text: 'Step 5: Verify WebGPU Functionality' },
       {
         type: 'p',
-        text: 'Safari enabled WebGPU starting with recent macOS and Safari versions, default-on for supported hardware. There is no flag to hunt; if the badge shows a fallback, the update path is the fix: a current macOS version plus current Safari. Apple silicon Macs are fully capable, and the unified memory architecture actually performs well on image workloads, since data never leaves the neighborhood of the compute units.',
+        text: 'After relaunching, reopen your WebGPU application and check whether the CPU fallback warning has disappeared. You can also visit chrome://gpu in Chrome or edge://gpu in Edge to inspect the browser\'s graphics configuration and identify potential GPU-related issues.',
+      },
+      { type: 'h3', text: 'What If WebGPU Still Does Not Work?' },
+      {
+        type: 'p',
+        text: 'If WebGPU continues to use a CPU fallback, the issue may be related to graphics driver compatibility, browser configuration, or hardware support. Update your graphics drivers, check whether your browser is using the appropriate GPU, and review the browser\'s GPU diagnostics for errors.',
+      },
+      {
+        type: 'callout',
+        title: 'Note',
+        text: 'WebGPU is enabled by default on many supported desktop systems. The available flags and their effects vary by browser version and operating system, so enabling a flag does not guarantee GPU acceleration.',
+      },
+      { type: 'h2', text: 'Mozilla Firefox', icons: ['firefox'] },
+      {
+        type: 'p',
+        text: 'Firefox ships WebGPU support in modern releases, enabled by default on major platforms. If your system still reports a CPU fallback, you can manually verify or enable WebGPU through Firefox\'s advanced configuration editor using the steps below.',
+      },
+      { type: 'h3', text: 'Step 1: Open the Configuration Page' },
+      {
+        type: 'p',
+        text: 'Launch Firefox on your desktop, type about:config into the address bar, and press Enter.',
+      },
+      { type: 'h3', text: 'Step 2: Accept the Warning and Proceed' },
+      {
+        type: 'p',
+        text: 'Firefox will prompt you with a warning that changing advanced preferences can affect performance and stability. Click "Accept the Risk and Continue" to open the configuration editor.',
+      },
+      { type: 'h3', text: 'Step 3: Search for WebGPU Preferences' },
+      {
+        type: 'p',
+        text: 'In the search preference name box at the top, type dom.webgpu.enabled to find the primary WebGPU setting.',
+      },
+      { type: 'h3', text: 'Step 4: Toggle the WebGPU Flags to True' },
+      {
+        type: 'p',
+        text: 'Double-click dom.webgpu.enabled (or click the toggle button on the right) to switch its value from false to true. If your graphics configuration requires forced acceleration (especially on Linux with Vulkan), search for gfx.webgpu.force-enabled as well and toggle it to true.',
+      },
+      { type: 'h3', text: 'Step 5: Restart Firefox and Verify' },
+      {
+        type: 'p',
+        text: 'Completely close and reopen Firefox to apply the changes. Visit about:support and check the "Graphics" section to confirm WebGPU status, or reload Pixelify and inspect the engine badge in Settings.',
+      },
+      { type: 'h3', text: 'Firefox Troubleshooting' },
+      {
+        type: 'p',
+        text: 'Firefox historically requires up-to-date Vulkan drivers on Linux/Windows and Metal on macOS. If Firefox still uses the CPU fallback, ensure your GPU drivers are updated to the latest vendor version, and verify that WebRender is operating in hardware acceleration mode under about:support.',
+      },
+      { type: 'h2', text: 'Brave Browser', icons: ['brave'] },
+      {
+        type: 'p',
+        text: 'Brave is built upon Chromium, giving it the same powerful hardware acceleration engine as Chrome. However, because Brave includes aggressive privacy shields and distinct flag defaults, WebGPU may sometimes be restricted. Follow these steps to enable WebGPU in Brave.',
+      },
+      { type: 'h3', text: 'Step 1: Open the Brave Flags Page' },
+      {
+        type: 'p',
+        text: 'Launch Brave Browser on your desktop. In the address bar, type brave://flags and press Enter to open the Experiments page.',
+      },
+      { type: 'h3', text: 'Step 2: Search for WebGPU' },
+      {
+        type: 'p',
+        text: 'In the search box at the top of the Experiments page, type WebGPU to filter for all WebGPU-related settings.',
+      },
+      { type: 'h3', text: 'Step 3: Enable the WebGPU Flags' },
+      {
+        type: 'p',
+        text: 'Locate the Force enable WebGPU interop and/or Unsafe WebGPU flags. Click the dropdown next to each applicable setting and switch it from Default to Enabled.',
+      },
+      { type: 'h3', text: 'Step 4: Check Brave Shields Fingerprinting Protections' },
+      {
+        type: 'p',
+        text: 'Brave Shields blocks fingerprinting by default, which can occasionally prevent sites from querying your GPU adapter details. If Pixelify still cannot initialize the GPU, click the Brave Lion shield icon in the URL bar for the site and ensure fingerprinting protection is not set to "Aggressive".',
+      },
+      { type: 'h3', text: 'Step 5: Relaunch Brave and Verify' },
+      {
+        type: 'p',
+        text: 'Click the Relaunch button at the bottom of the flags page to restart Brave. Once restarted, visit brave://gpu to check the WebGPU status, or return to Pixelify and check if the engine status shows GPU acceleration.',
+      },
+      { type: 'h3', text: 'Brave Troubleshooting' },
+      {
+        type: 'p',
+        text: 'If Brave still uses the CPU fallback, navigate to brave://settings/system and verify that "Use graphics acceleration when available" is turned ON. Also ensure that your operating system has assigned Brave to your high-performance discrete GPU.',
+      },
+      { type: 'h2', text: 'Safari on macOS', icons: ['safari'] },
+      {
+        type: 'p',
+        text: 'Safari enabled WebGPU starting with recent macOS and Safari versions, default-on for supported Apple Silicon and modern Intel hardware. If you need to inspect or configure WebGPU in Safari, follow the steps below.',
+      },
+      { type: 'h3', text: 'Step 1: Enable the Develop Menu' },
+      {
+        type: 'p',
+        text: 'Open Safari on macOS. In the menu bar, click Safari > Settings (or Preferences), select the Advanced tab, and check the box for "Show features for web developers" (or "Show Develop menu in menu bar").',
+      },
+      { type: 'h3', text: 'Step 2: Open Feature Flags' },
+      {
+        type: 'p',
+        text: 'Click the Develop menu in the top menu bar, and navigate to Feature Flags (or Experimental Features on older Safari versions).',
+      },
+      { type: 'h3', text: 'Step 3: Enable WebGPU' },
+      {
+        type: 'p',
+        text: 'In the search filter, type WebGPU. Locate the WebGPU entry and ensure the checkbox is checked/enabled.',
+      },
+      { type: 'h3', text: 'Step 4: Restart Safari and Verify' },
+      {
+        type: 'p',
+        text: 'Quit and reopen Safari. Reopen Pixelify and check the engine status badge in Settings (gear icon) to confirm GPU acceleration is active.',
       },
       { type: 'h2', text: 'Android and iOS' },
       {

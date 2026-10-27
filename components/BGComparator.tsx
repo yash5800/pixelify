@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
 import { Crop as CropIcon } from 'lucide-react';
 import FabricImageEditor, {
   FabricEditMode,
@@ -77,8 +76,10 @@ export interface BGComparatorProps {
   onSelectLayer?: (id: string | null) => void;
   onUpdateTextLayerPosition?: (id: string, x: number, y: number) => void;
   onUpdateElementLayerPosition?: (id: string, x: number, y: number) => void;
+  onUpdateTextLayer?: (id: string, changes: Partial<TextLayer>) => void;
   onDeleteLayer?: (id: string) => void;
   onResetSubjectPosition?: () => void;
+  onArtboardSizeChange?: (width: number, height: number) => void;
 }
 
 export default function BGComparator({
@@ -124,8 +125,10 @@ export default function BGComparator({
   onSelectLayer,
   onUpdateTextLayerPosition,
   onUpdateElementLayerPosition,
+  onUpdateTextLayer,
   onDeleteLayer,
   onResetSubjectPosition,
+  onArtboardSizeChange,
 }: BGComparatorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const artboardRef = useRef<HTMLDivElement | null>(null);
@@ -360,6 +363,13 @@ export default function BGComparator({
     artboardDisplayHeight = maxH;
     artboardDisplayWidth = Math.round(maxH * artboardRatio);
   }
+
+  // Report artboard display dimensions to parent (so export canvas can accurately scale design layers)
+  useEffect(() => {
+    if (artboardDisplayWidth > 0 && artboardDisplayHeight > 0) {
+      onArtboardSizeChange?.(artboardDisplayWidth, artboardDisplayHeight);
+    }
+  }, [artboardDisplayWidth, artboardDisplayHeight, onArtboardSizeChange]);
 
   // Reset subject position when requested or when job changes
   useEffect(() => {
@@ -704,6 +714,139 @@ export default function BGComparator({
     const verticalInset = ((1 - resultAspectRatio / targetRatio) * 50).toFixed(3);
     return `inset(${verticalInset}% 0 ${verticalInset}% 0)`;
   })();
+
+  // -------------------------------------------------------------
+  // DESIGN OVERLAY LAYERS DRAG & DROP (SMOOTH POINTER EVENTS)
+  // -------------------------------------------------------------
+  const [draggingLayer, setDraggingLayer] = useState<{
+    id: string;
+    type: 'text' | 'element';
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const dragStartRef = useRef<{
+    id: string;
+    type: 'text' | 'element';
+    pointerId: number;
+    startX: number;
+    startY: number;
+    layerStartX: number;
+    layerStartY: number;
+    hasMoved: boolean;
+  } | null>(null);
+
+  const handleLayerPointerDown = (
+    e: React.PointerEvent<HTMLDivElement>,
+    id: string,
+    type: 'text' | 'element',
+    currentX: number,
+    currentY: number
+  ) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    if ((e.target as HTMLElement).closest('button')) return;
+
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch (err) {
+      // ignore
+    }
+
+    dragStartRef.current = {
+      id,
+      type,
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      layerStartX: currentX,
+      layerStartY: currentY,
+      hasMoved: false,
+    };
+
+    setDraggingLayer({
+      id,
+      type,
+      x: currentX,
+      y: currentY,
+    });
+  };
+
+  const handleLayerPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragStartRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+
+    if (!drag.hasMoved && Math.hypot(dx, dy) > 3) {
+      drag.hasMoved = true;
+      onSelectLayer?.(drag.id);
+    }
+
+    if (drag.hasMoved) {
+      const artboardRect = artboardRef.current?.getBoundingClientRect();
+      if (!artboardRect || artboardRect.width === 0 || artboardRect.height === 0) return;
+
+      const deltaPercentX = (dx / artboardRect.width) * 100;
+      const deltaPercentY = (dy / artboardRect.height) * 100;
+
+      const newX = Math.max(0, Math.min(100, drag.layerStartX + deltaPercentX));
+      const newY = Math.max(0, Math.min(100, drag.layerStartY + deltaPercentY));
+
+      setDraggingLayer({
+        id: drag.id,
+        type: drag.type,
+        x: Math.round(newX * 10) / 10,
+        y: Math.round(newY * 10) / 10,
+      });
+    }
+  };
+
+  const handleLayerPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragStartRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch (err) {
+      // ignore
+    }
+
+    if (drag.hasMoved) {
+      const artboardRect = artboardRef.current?.getBoundingClientRect();
+      if (artboardRect && artboardRect.width > 0 && artboardRect.height > 0) {
+        const dx = e.clientX - drag.startX;
+        const dy = e.clientY - drag.startY;
+        const deltaPercentX = (dx / artboardRect.width) * 100;
+        const deltaPercentY = (dy / artboardRect.height) * 100;
+
+        const finalX = Math.max(0, Math.min(100, Math.round((drag.layerStartX + deltaPercentX) * 10) / 10));
+        const finalY = Math.max(0, Math.min(100, Math.round((drag.layerStartY + deltaPercentY) * 10) / 10));
+
+        if (drag.type === 'text') {
+          onUpdateTextLayerPosition?.(drag.id, finalX, finalY);
+        } else {
+          onUpdateElementLayerPosition?.(drag.id, finalX, finalY);
+        }
+      }
+    } else {
+      onSelectLayer?.(drag.id);
+    }
+
+    dragStartRef.current = null;
+    setDraggingLayer(null);
+  };
+
+  const handleLayerPointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch (err) {
+      // ignore
+    }
+    dragStartRef.current = null;
+    setDraggingLayer(null);
+  };
 
   return (
     <div className="relative w-full flex flex-col items-center justify-center select-none">
@@ -1067,41 +1210,43 @@ export default function BGComparator({
 
             {/* 3. DESIGN OVERLAY LAYERS (TEXT & SHAPES / BADGES / STICKERS) */}
             {!isProcessing && !isCompareMode && !fabricEditMode && (
-              <div className="absolute inset-0 pointer-events-none z-30 overflow-hidden">
+              <div
+                className="absolute inset-0 pointer-events-none z-30 overflow-hidden"
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) {
+                    onSelectLayer?.(null);
+                  }
+                }}
+              >
                 {/* 1. RENDER ELEMENT LAYERS */}
                 {elementLayers.map((el) => {
                   const isSelected = selectedLayerId === el.id;
+                  const isBeingDragged = draggingLayer?.id === el.id;
+                  const posX = isBeingDragged ? draggingLayer.x : el.x;
+                  const posY = isBeingDragged ? draggingLayer.y : el.y;
                   const preset = ELEMENT_PRESETS.find((p) => p.key === el.key);
 
                   return (
-                    <motion.div
+                    <div
                       key={el.id}
-                      drag
-                      dragConstraints={artboardRef}
-                      dragMomentum={false}
-                      onDragEnd={(_e, info) => {
-                        const rect = artboardRef.current?.getBoundingClientRect();
-                        if (!rect) return;
-                        const deltaX = (info.offset.x / rect.width) * 100;
-                        const deltaY = (info.offset.y / rect.height) * 100;
-                        onUpdateElementLayerPosition?.(el.id, el.x + deltaX, el.y + deltaY);
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSelectLayer?.(el.id);
-                      }}
-                      className={`absolute pointer-events-auto cursor-move select-none p-1 rounded-xl transition-all ${isSelected ? 'ring-2 ring-[#00FF85] shadow-2xl' : 'hover:ring-1 hover:ring-white/40'
-                        }`}
+                      onPointerDown={(e) => handleLayerPointerDown(e, el.id, 'element', el.x, el.y)}
+                      onPointerMove={handleLayerPointerMove}
+                      onPointerUp={handleLayerPointerUp}
+                      onPointerCancel={handleLayerPointerCancel}
+                      className={`absolute pointer-events-auto cursor-move select-none p-1 rounded-xl transition-shadow ${
+                        isSelected ? 'ring-2 ring-[#00FF85] shadow-2xl z-40' : 'hover:ring-1 hover:ring-white/40 z-30'
+                      } ${isBeingDragged ? 'cursor-grabbing opacity-90' : ''}`}
                       style={{
-                        left: `${el.x}%`,
-                        top: `${el.y}%`,
+                        left: `${posX}%`,
+                        top: `${posY}%`,
                         transform: `translate(-50%, -50%) rotate(${el.rotation || 0}deg)`,
                         opacity: el.opacity ?? 1,
+                        touchAction: 'none',
                       }}
                     >
                       {el.type === 'badge' ? (
                         <div
-                          className="px-4 py-2 rounded-full font-black text-sm border-2 shadow-2xl whitespace-nowrap bg-[#09090D] flex items-center justify-center"
+                          className="px-4 py-2 rounded-full font-black text-sm border-2 shadow-2xl whitespace-nowrap bg-[#09090D] flex items-center justify-center pointer-events-none"
                           style={{
                             borderColor: el.color,
                             color: el.color,
@@ -1115,6 +1260,7 @@ export default function BGComparator({
                         <svg
                           viewBox="0 0 24 24"
                           fill={el.color}
+                          className="pointer-events-none"
                           style={{
                             width: `${el.size}px`,
                             height: `${el.size}px`,
@@ -1132,63 +1278,75 @@ export default function BGComparator({
                             e.stopPropagation();
                             onDeleteLayer?.(el.id);
                           }}
-                          className="absolute -top-3 -right-3 w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center text-[10px] font-bold shadow-lg hover:bg-rose-700 transition"
+                          className="absolute -top-3 -right-3 w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center text-[10px] font-bold shadow-lg hover:bg-rose-700 transition z-50 pointer-events-auto cursor-pointer"
                           title="Delete Layer"
                         >
                           ✕
                         </button>
                       )}
-                    </motion.div>
+                    </div>
                   );
                 })}
 
                 {/* 2. RENDER TEXT LAYERS */}
                 {textLayers.map((tl) => {
                   const isSelected = selectedLayerId === tl.id;
+                  const isBeingDragged = draggingLayer?.id === tl.id;
+                  const posX = isBeingDragged ? draggingLayer.x : tl.x;
+                  const posY = isBeingDragged ? draggingLayer.y : tl.y;
                   let pillBg = 'transparent';
                   if (tl.bgPill === 'black') pillBg = 'rgba(9, 9, 13, 0.85)';
                   if (tl.bgPill === 'mint') pillBg = '#00FF85';
                   if (tl.bgPill === 'white') pillBg = '#FFFFFF';
                   if (tl.bgPill === 'crimson') pillBg = '#F43F5E';
+                  if (tl.bgPill === 'sky') pillBg = '#38BDF8';
+                  if (tl.bgPill === 'amber') pillBg = '#F59E0B';
 
                   return (
-                    <motion.div
+                    <div
                       key={tl.id}
-                      drag
-                      dragConstraints={artboardRef}
-                      dragMomentum={false}
-                      onDragEnd={(_e, info) => {
-                        const rect = artboardRef.current?.getBoundingClientRect();
-                        if (!rect) return;
-                        const deltaX = (info.offset.x / rect.width) * 100;
-                        const deltaY = (info.offset.y / rect.height) * 100;
-                        onUpdateTextLayerPosition?.(tl.id, tl.x + deltaX, tl.y + deltaY);
-                      }}
-                      onClick={(e) => {
+                      onPointerDown={(e) => handleLayerPointerDown(e, tl.id, 'text', tl.x, tl.y)}
+                      onPointerMove={handleLayerPointerMove}
+                      onPointerUp={handleLayerPointerUp}
+                      onPointerCancel={handleLayerPointerCancel}
+                      onDoubleClick={(e) => {
                         e.stopPropagation();
                         onSelectLayer?.(tl.id);
                       }}
-                      className={`absolute pointer-events-auto cursor-move select-none p-1.5 rounded-xl transition-all ${isSelected ? 'ring-2 ring-[#00FF85] shadow-2xl' : 'hover:ring-1 hover:ring-white/40'
-                        }`}
+                      className={`absolute pointer-events-auto select-none p-1.5 rounded-xl transition-shadow ${
+                        isSelected
+                          ? 'ring-2 ring-[#00FF85] shadow-2xl z-40 cursor-move'
+                          : 'hover:ring-1 hover:ring-white/40 z-30 cursor-move'
+                      } ${isBeingDragged ? 'cursor-grabbing opacity-90' : ''}`}
                       style={{
-                        left: `${tl.x}%`,
-                        top: `${tl.y}%`,
+                        left: `${posX}%`,
+                        top: `${posY}%`,
                         transform: 'translate(-50%, -50%)',
+                        touchAction: 'none',
                       }}
                     >
                       <div
-                        className="px-3 py-1 rounded-xl whitespace-pre-wrap transition-colors leading-tight"
+                        className="px-3 py-1 rounded-xl whitespace-pre-wrap transition-colors leading-tight pointer-events-none"
                         style={{
                           fontFamily: tl.fontFamily,
                           fontSize: `${tl.fontSize}px`,
                           fontWeight: tl.fontWeight,
+                          fontStyle: tl.italic ? 'italic' : 'normal',
+                          textDecoration: tl.underline ? 'underline' : 'none',
+                          letterSpacing: tl.letterSpacing ? `${tl.letterSpacing}px` : undefined,
+                          textTransform: tl.uppercase ? 'uppercase' : 'none',
+                          lineHeight: tl.lineHeight || 1.25,
                           color: tl.color,
                           textAlign: tl.align,
                           backgroundColor: pillBg,
-                          textShadow: tl.shadow ? '0 4px 14px rgba(0,0,0,0.8)' : undefined,
+                          textShadow: tl.glow
+                            ? `0 0 20px ${tl.color}`
+                            : tl.shadow
+                            ? '0 4px 14px rgba(0,0,0,0.8)'
+                            : undefined,
                         }}
                       >
-                        {tl.text}
+                        {tl.uppercase ? tl.text.toUpperCase() : tl.text}
                       </div>
 
                       {isSelected && (
@@ -1198,13 +1356,13 @@ export default function BGComparator({
                             e.stopPropagation();
                             onDeleteLayer?.(tl.id);
                           }}
-                          className="absolute -top-3 -right-3 w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center text-[10px] font-bold shadow-lg hover:bg-rose-700 transition"
+                          className="absolute -top-3 -right-3 w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center text-[10px] font-bold shadow-lg hover:bg-rose-700 transition z-50 pointer-events-auto cursor-pointer"
                           title="Delete Text"
                         >
                           ✕
                         </button>
                       )}
-                    </motion.div>
+                    </div>
                   );
                 })}
               </div>

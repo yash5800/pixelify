@@ -27,7 +27,7 @@ export default function AboutPage({ onTabChange }: Props) {
       toc={TOC}
       documentTitle="About Pixelify: Local AI Image Studio"
       metaDescription="Pixelify runs AI image upscaling and background removal entirely in your browser with
-      WebGPU and WebAssembly. No uploads, no accounts, no tracking, and we explain exactly how."
+      WebGPU and WebAssembly. No uploads, no accounts, no cross-site tracking, and we explain exactly how."
       onTabChange={onTabChange}
     >
       <Section id="why" num={1} title="Why Pixelify exists">
@@ -106,17 +106,18 @@ export default function AboutPage({ onTabChange }: Props) {
       <Section id="privacy" num={4} title="Our privacy stance">
         <P>
           Privacy here is a property of the architecture, not a promise in a policy. We cannot
-          leak, sell, or lose image data we never receive. There are no accounts, no analytics
-          scripts, no advertising pixels, and no first-party cookies on this site. The only things
-          we store are your theme and sound preferences, in your own browser's local storage;
-          clear your site data and they are gone. The site is supported by Google AdSense ads on
-          content pages. AdSense sets its own cookies (Google's cookies, not ours), and the ad
-          code never touches the AI tools: your images are still never uploaded anywhere.
+          leak, sell, or lose image data we never receive. There are no accounts, session replay,
+          advertising pixels, or first-party cookies on this site. A cookieless external counter
+          records aggregate site visits; it does not receive images or tool usage.
+          Your theme and sound preferences stay in your own browser's local storage. The site is
+          supported by Google AdSense ads on content pages. AdSense sets its own cookies (Google's
+          cookies, not ours), and the ad code never touches the AI tools: your images are still
+          never uploaded anywhere.
         </P>
         <P>
           For completeness: your browser does make a few ordinary requests to load the site: the
-          application itself, the model files, fonts, and the open-source libraries that power
-          inference. None of those requests contain your images. The full breakdown is in our
+          application itself, the model files, fonts, open-source libraries, and an aggregate
+          site visit count. None of those requests contain your images. The full breakdown is in our
           <a href="/privacy"> Privacy Policy</a>, written to be checkable against the code rather
           than taken on faith.
         </P>

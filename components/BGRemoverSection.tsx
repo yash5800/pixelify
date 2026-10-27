@@ -12,7 +12,7 @@ export default function BGRemoverSection({ onLaunchBGRemove }: BGRemoverSectionP
     const { warmup } = useApp();
 
     return (
-        <section className="w-screen max-w-[100vw] relative left-1/2 -translate-x-1/2 rounded-[28px] sm:rounded-[44px] bg-white text-neutral-900 py-10 sm:py-12 lg:py-14 px-4 sm:px-8 lg:px-12 shadow-[0_30px_100px_rgba(0,0,0,0.7)] relative z-20 overflow-hidden">
+        <section className="w-full rounded-[28px] sm:rounded-[44px] bg-white text-neutral-900 py-10 sm:py-12 lg:py-14 px-4 sm:px-8 lg:px-12 shadow-[0_30px_100px_rgba(0,0,0,0.7)] relative z-20 overflow-hidden">
             {/* Scoped styles replicating the exact 3D tilt & pop-out animation from ztest.html */}
             <style dangerouslySetInnerHTML={{ __html: `
         .bgr-3d-wrapper {

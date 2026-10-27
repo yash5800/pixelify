@@ -131,24 +131,150 @@ export const POSTS_FR = [
         title: 'Où regarder',
         text: 'Paramètres (icône engrenage) → badges du moteur. Chaque outil rapporte son propre moteur actif, relu directement depuis l\'environnement d\'exécution plutôt que supposé, afin que le badge reflète la réalité et non un optimisme de détection de fonctionnalités.',
       },
-      { type: 'h2', text: 'Chrome et Edge sur ordinateur' },
+      { type: 'h2', text: 'Chrome et Microsoft Edge', icons: ['chrome', 'edge'] },
       {
         type: 'p',
-        text: 'Les versions récentes de Chrome et Edge activent WebGPU par défaut sur la plupart des matériels de bureau. Si le badge affiche toujours le recours au CPU, l\'étape suivante consiste à modifier le fanion (flag). Naviguez vers la page des fonctionnalités expérimentales du navigateur (l\'adresse est chrome://flags sur les deux navigateurs), recherchez « WebGPU », et faites passer l\'entrée de Default à Enabled, puis relancez le navigateur lorsque cela vous est demandé. Sur Linux, un paramètre de lancement supplémentaire limitait historiquement la disponibilité ; sur Windows et macOS, un simple redémarrage du navigateur suffit généralement.',
+        text: 'Si votre navigateur utilise le recours au processeur (CPU) plutôt que l\'accélération graphique (GPU), l\'activation du fanion (flag) WebGPU approprié peut résoudre le problème. Suivez les étapes ci-dessous pour vérifier et configurer WebGPU dans Google Chrome ou Microsoft Edge.',
+      },
+      {
+        type: 'img',
+        src: '/blogs/how-to-webgpu-chrome.png',
+        alt: 'Activation des drapeaux WebGPU dans Google Chrome et Microsoft Edge',
+        caption: 'Recherchez « WebGPU » dans chrome://flags ou edge://flags et activez le paramètre.',
+      },
+      { type: 'h3', text: 'Étape 1 : Ouvrir la page des fonctionnalités expérimentales' },
+      {
+        type: 'p',
+        text: 'Lancez Google Chrome ou Microsoft Edge sur votre ordinateur. Cliquez sur la barre d\'adresse, saisissez chrome://flags dans Chrome ou edge://flags dans Microsoft Edge, puis appuyez sur Entrée pour accéder à la page des fonctionnalités expérimentales.',
+      },
+      { type: 'h3', text: 'Étape 2 : Rechercher WebGPU' },
+      {
+        type: 'p',
+        text: 'Une fois la page Experiments ouverte, repérez la zone de recherche en haut. Tapez WebGPU pour filtrer les paramètres disponibles et afficher les drapeaux relatifs à WebGPU.',
+      },
+      { type: 'h3', text: 'Étape 3 : Activer le drapeau WebGPU' },
+      {
+        type: 'p',
+        text: 'Trouvez l\'option « Force enable WebGPU interop », comme illustré sur la capture d\'écran. Cliquez sur le menu déroulant à côté et sélectionnez Enabled (Activé) au lieu de Default.',
       },
       {
         type: 'p',
-        text: 'Si l\'activation du fanion ne modifie pas le badge, la cause se situe en dessous du navigateur : le pilote graphique. WebGPU nécessite des pilotes suffisamment récents, et les utilisateurs d\'ordinateurs portables doivent vérifier que le navigateur s\'exécute sur le GPU dédié plutôt que sur le GPU intégré ; de nombreuses machines configurent les navigateurs par défaut en mode économie d\'énergie, ce qui limite silencieusement les capacités de calcul. La page de diagnostic GPU du navigateur et les paramètres graphiques du système d\'exploitation exposent tous deux cette information.',
+        text: 'Ce drapeau concerne principalement des configurations graphiques spécifiques, notamment celles basées sur Vulkan sous Linux. Si cette option n\'est pas disponible ou ne s\'applique pas à votre système, n\'en déduisez pas que son activation est strictement obligatoire pour faire fonctionner WebGPU.',
       },
-      { type: 'h2', text: 'Firefox' },
+      { type: 'h3', text: 'Étape 4 : Relancer le navigateur' },
       {
         type: 'p',
-        text: 'Firefox prend en charge WebGPU dans ses versions actuelles, activé par défaut sur les plates-formes majeures. Sur les versions plus anciennes, il se trouve derrière le même mécanisme de configuration : ouvrez la page de configuration expérimentale (about:config), recherchez les entrées WebGPU et activez-les individuellement. Firefox a historiquement été le plus conservateur dans le déploiement de cette fonctionnalité, donc maintenir le navigateur à jour importe plus ici qu\'ailleurs ; chaque version élargit significativement la compatibilité matérielle.',
+        text: 'Après avoir modifié le paramètre, cliquez sur le bouton Relaunch (Relancer) si le navigateur l\'affiche. Cela redémarre le navigateur et applique la nouvelle configuration expérimentale. Pensez à enregistrer vos travaux en cours avant de redémarrer.',
       },
-      { type: 'h2', text: 'Safari sur macOS' },
+      { type: 'h3', text: 'Étape 5 : Vérifier le fonctionnement de WebGPU' },
       {
         type: 'p',
-        text: 'Safari intègre WebGPU à partir des versions récentes de macOS et Safari, activé par défaut pour le matériel compatible. Il n\'y a aucun fanion à chercher ; si le badge indique un recours au CPU, la solution passe par la mise à jour : une version récente de macOS combinée à une version récente de Safari. Les Macs équipés de puces Apple Silicon sont pleinement capables, et l\'architecture de mémoire unifiée offre d\'excellentes performances sur les charges de travail d\'image, puisque les données ne quittent jamais la proximité des unités de calcul.',
+        text: 'Après le redémarrage, rouvrez votre application WebGPU et vérifiez si l\'avertissement de basculement sur le CPU a disparu. Vous pouvez également visiter chrome://gpu dans Chrome ou edge://gpu dans Edge pour examiner la configuration graphique du navigateur et identifier d\'éventuels blocages matériels.',
+      },
+      { type: 'h3', text: 'Que faire si WebGPU ne fonctionne toujours pas ?' },
+      {
+        type: 'p',
+        text: 'Si WebGPU continue d\'utiliser le CPU, le problème peut provenir de la compatibilité du pilote graphique, de la configuration du navigateur ou du matériel. Mettez à jour vos pilotes graphiques, assurez-vous que votre navigateur utilise bien la carte graphique dédiée appropriée et consultez les diagnostics GPU du navigateur pour identifier les erreurs.',
+      },
+      {
+        type: 'callout',
+        title: 'Remarque',
+        text: 'WebGPU est activé par défaut sur de nombreux systèmes de bureau compatibles. Les drapeaux disponibles et leurs effets varient selon la version du navigateur et le système d\'exploitation ; l\'activation d\'un drapeau ne garantit donc pas automatiquement l\'accélération matérielle.',
+      },
+      { type: 'h2', text: 'Mozilla Firefox', icons: ['firefox'] },
+      {
+        type: 'p',
+        text: 'Firefox prend en charge WebGPU dans ses versions modernes, activé par défaut sur les plates-formes majeures. Si votre système signale toujours un basculement sur le CPU, vous pouvez vérifier ou activer manuellement WebGPU via l\'éditeur de configuration avancée de Firefox en suivant les étapes ci-dessous.',
+      },
+      { type: 'h3', text: 'Étape 1 : Ouvrir la page de configuration' },
+      {
+        type: 'p',
+        text: 'Lancez Firefox sur votre ordinateur, tapez about:config dans la barre d\'adresse et appuyez sur Entrée.',
+      },
+      { type: 'h3', text: 'Étape 2 : Accepter l\'avertissement et continuer' },
+      {
+        type: 'p',
+        text: 'Firefox affichera un message d\'avertissement indiquant que la modification des préférences avancées peut affecter les performances et la stabilité. Cliquez sur « Accepter le risque et poursuivre » pour ouvrir l\'éditeur de configuration.',
+      },
+      { type: 'h3', text: 'Étape 3 : Rechercher les préférences WebGPU' },
+      {
+        type: 'p',
+        text: 'Dans la zone de recherche en haut, tapez dom.webgpu.enabled pour localiser le paramètre principal de WebGPU.',
+      },
+      { type: 'h3', text: 'Étape 4 : Basculer les paramètres WebGPU sur True' },
+      {
+        type: 'p',
+        text: 'Double-cliquez sur dom.webgpu.enabled (ou cliquez sur le bouton bascule à droite) pour faire passer sa valeur de false à true. Si votre configuration graphique nécessite une accélération forcée (notamment sous Linux avec Vulkan), recherchez également gfx.webgpu.force-enabled et passez-le à true.',
+      },
+      { type: 'h3', text: 'Étape 5 : Redémarrer Firefox et vérifier' },
+      {
+        type: 'p',
+        text: 'Fermez complètement puis rouvrez Firefox pour appliquer les modifications. Rendez-vous sur about:support et consultez la section « Accélération graphique » pour confirmer l\'état de WebGPU, ou rechargez Pixelify et examinez le badge du moteur dans les Paramètres.',
+      },
+      { type: 'h3', text: 'Dépannage pour Firefox' },
+      {
+        type: 'p',
+        text: 'Firefox requiert des pilotes Vulkan à jour sous Linux/Windows et Metal sous macOS. Si Firefox persiste à utiliser le CPU, vérifiez que vos pilotes graphiques sont mis à jour avec la dernière version du constructeur, et assurez-vous que WebRender fonctionne bien en mode accélération matérielle sur about:support.',
+      },
+      { type: 'h2', text: 'Brave Browser', icons: ['brave'] },
+      {
+        type: 'p',
+        text: 'Brave est construit sur la base de Chromium, ce qui lui confère le même puissant moteur d\'accélération matérielle que Chrome. Cependant, comme Brave intègre des boucliers stricts de protection de la vie privée et des réglages par défaut spécifiques, WebGPU peut parfois être restreint. Suivez ces étapes pour activer WebGPU dans Brave.',
+      },
+      { type: 'h3', text: 'Étape 1 : Ouvrir la page des drapeaux Brave' },
+      {
+        type: 'p',
+        text: 'Lancez le navigateur Brave sur votre ordinateur. Dans la barre d\'adresse, tapez brave://flags et appuyez sur Entrée pour accéder à la page Experiments.',
+      },
+      { type: 'h3', text: 'Étape 2 : Rechercher WebGPU' },
+      {
+        type: 'p',
+        text: 'Dans la zone de recherche en haut de la page des fonctionnalités expérimentales, tapez WebGPU pour filtrer tous les réglages associés à WebGPU.',
+      },
+      { type: 'h3', text: 'Étape 3 : Activer les drapeaux WebGPU' },
+      {
+        type: 'p',
+        text: 'Repérez les drapeaux « Force enable WebGPU interop » et/ou « Unsafe WebGPU ». Cliquez sur le menu déroulant à côté de chaque paramètre concerné et passez-le de Default à Enabled.',
+      },
+      { type: 'h3', text: 'Étape 4 : Vérifier la protection contre le pistage des boucliers Brave' },
+      {
+        type: 'p',
+        text: 'Les boucliers Brave bloquent le pistage par empreinte numérique (fingerprinting) par défaut, ce qui peut parfois empêcher les sites web d\'interroger les détails de votre carte graphique. Si Pixelify ne parvient toujours pas à initialiser le GPU, cliquez sur l\'icône du lion Brave dans la barre d\'adresse pour ce site et assurez-vous que la protection contre les empreintes n\'est pas réglée sur « Agressif ».'
+      },
+      { type: 'h3', text: 'Étape 5 : Relancer Brave et vérifier' },
+      {
+        type: 'p',
+        text: 'Cliquez sur le bouton Relaunch en bas de la page des drapeaux pour redémarrer Brave. Une fois relancé, visitez brave://gpu pour vérifier le statut de WebGPU, ou revenez sur Pixelify et vérifiez que le statut du moteur indique bien l\'accélération GPU.',
+      },
+      { type: 'h3', text: 'Dépannage pour Brave' },
+      {
+        type: 'p',
+        text: 'Si Brave continue d\'utiliser le CPU, naviguez vers brave://settings/system et vérifiez que l\'option « Utiliser l\'accélération matérielle si disponible » est bien activée. Veillez également à ce que votre système d\'exploitation attribue bien à Brave votre GPU dédié haute performance.',
+      },
+      { type: 'h2', text: 'Safari sur macOS', icons: ['safari'] },
+      {
+        type: 'p',
+        text: 'Safari prend en charge WebGPU depuis les versions récentes de macOS et Safari, activé par défaut sur les puces Apple Silicon et le matériel Intel compatible. Si vous devez inspecter ou configurer WebGPU dans Safari, suivez les étapes ci-dessous.',
+      },
+      { type: 'h3', text: 'Étape 1 : Activer le menu Développement' },
+      {
+        type: 'p',
+        text: 'Ouvrez Safari sur macOS. Dans la barre de menus, cliquez sur Safari > Réglages (ou Préférences), sélectionnez l\'onglet Avancé, puis cochez la case « Afficher les fonctionnalités pour les développeurs web » (ou « Afficher le menu Développement dans la barre des menus »).',
+      },
+      { type: 'h3', text: 'Étape 2 : Ouvrir les drapeaux de fonctionnalités (Feature Flags)' },
+      {
+        type: 'p',
+        text: 'Cliquez sur le menu Développement dans la barre de menus supérieure, puis rendez-vous dans Fonctionnalités expérimentales (ou Feature Flags sur les versions récentes de Safari).',
+      },
+      { type: 'h3', text: 'Étape 3 : Activer WebGPU' },
+      {
+        type: 'p',
+        text: 'Dans le filtre de recherche, tapez WebGPU. Localisez la ligne WebGPU et assurez-vous que la case est cochée/activée.',
+      },
+      { type: 'h3', text: 'Étape 4 : Redémarrer Safari et vérifier' },
+      {
+        type: 'p',
+        text: 'Quittez et rouvrez Safari. Ouvrez à nouveau Pixelify et vérifiez le badge de statut du moteur dans les Paramètres (icône d\'engrenage) pour confirmer que l\'accélération GPU est active.',
       },
       { type: 'h2', text: 'Android et iOS' },
       {

@@ -80,7 +80,7 @@ export default function BlogList({ onTabChange, initialLang }: BlogListProps) {
     const meta = document.querySelector<HTMLMetaElement>('meta[name="description"]');
     if (meta) {
       meta.content =
-        'In-depth articles about local AI, privacy, background removal, upscaling, WebGPU and how the site runs everything on-device: no cloud, no uploads, no tracking.';
+        'In-depth articles about local AI, privacy, background removal, upscaling, WebGPU and how the site runs image processing on-device: no cloud uploads or cross-site tracking.';
     }
   }, [isSearching, query]);
 
@@ -117,7 +117,7 @@ export default function BlogList({ onTabChange, initialLang }: BlogListProps) {
           <p className="mt-5 max-w-3xl text-[15px] leading-relaxed text-muted">
             In-depth articles on local AI, privacy-first image processing, background removal,
             super-resolution, WebGPU and how the site runs everything on-device: no cloud, no
-            uploads, no tracking.
+            uploads, no cross-site tracking.
           </p>
 
           {/* SEARCH */}
