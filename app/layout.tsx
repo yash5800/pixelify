@@ -32,7 +32,10 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: 'Pixelify' }],
   applicationName: 'Pixelify',
-  appleWebApp: { title: 'Pixelify' },
+  appleWebApp: { title: 'Pixelify', capable: true, statusBarStyle: 'default' },
+  other: {
+    'mobile-web-app-capable': 'yes',
+  },
   alternates: {
     canonical: '/',
   },

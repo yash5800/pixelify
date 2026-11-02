@@ -69,7 +69,7 @@ const FEATURES_TABS = [
     badge: '8x Factor',
     detailTitle: 'Vitality, Pixel-Dance & Alpha-Satoru',
     detailDesc:
-      'Direct ONNX Runtime Web execution utilizing WebGPU shaders for hardware-accelerated tensor math.',
+      'Direct LiteRT execution utilizing WebGPU shaders for hardware-accelerated tensor math.',
   },
   {
     id: 'f4',

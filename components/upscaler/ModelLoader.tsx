@@ -7,16 +7,23 @@ interface LoaderProps {
    * indeterminate demo animation.
    */
   progress?: number | null;
+  className?: string;
+  width?: string;
 }
 
-const Loader = ({ progress }: LoaderProps) => {
+const Loader = ({ progress, className, width }: LoaderProps) => {
   const determinate = typeof progress === "number";
   const pct = determinate
     ? Math.max(0, Math.min(100, progress as number))
     : null;
 
   return (
-    <div className="ml-container" role="status" aria-label="Loading AI model">
+    <div
+      className={`ml-container ${className || ""}`}
+      style={width ? { width } : undefined}
+      role="status"
+      aria-label="Loading AI model"
+    >
       <div
         className={`ml-bar${determinate ? " ml-bar--determinate" : ""}`}
         style={determinate ? { width: `${pct}%` } : undefined}

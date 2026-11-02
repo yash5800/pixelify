@@ -1,26 +1,24 @@
 import { useState, useCallback, useRef } from 'react';
-import { detectBackend, MODELS } from '../lib/constants';
-import { loadONNX, createSession, isUpscalerModelCached } from '../utils/upscale';
-import type { Backend, ModelKey } from '../types';
+import { MODELS } from '../lib/constants';
+import { loadLiteRT, createSession, isUpscalerModelCached } from '../utils/upscale';
+import type { ModelKey } from '../types';
 
-interface UseONNXReturn {
-  ortRef: React.MutableRefObject<any>;
-  backend: Backend | null;
-  /** Execution provider the loaded session ACTUALLY runs on ('wasm' | 'webgpu') */
+interface UseLiteRTReturn {
+  runtimeRef: React.MutableRefObject<any>;
+  /** LiteRT accelerator selected for the loaded model. */
   execEngine: 'wasm' | 'webgpu' | null;
   sessionRef: React.MutableRefObject<any>;
   isLoading: boolean;
   /** 0–100 real progress of the in-flight model load; null when idle. */
   modelProgress: number | null;
-  initONNX: () => Promise<void>;
+  initLiteRT: () => Promise<void>;
   loadModel: (key: ModelKey, opts?: { silentIfCached?: boolean }) => Promise<boolean>;
   unloadModel: () => Promise<void>;
 }
 
-export function useONNX(): UseONNXReturn {
-  const ortRef = useRef<any>(null);
+export function useLiteRT(): UseLiteRTReturn {
+  const runtimeRef = useRef<any>(null);
   const sessionRef = useRef<any>(null);
-  const [backend, setBackend] = useState<Backend | null>(null);
   const [execEngine, setExecEngine] = useState<'wasm' | 'webgpu' | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [modelProgress, setModelProgress] = useState<number | null>(null);
@@ -28,16 +26,14 @@ export function useONNX(): UseONNXReturn {
   const modelLoadsRef = useRef(new Map<ModelKey, { promise: Promise<boolean>; controller: AbortController }>());
   const sessionGenerationRef = useRef(0);
 
-  const initONNX = useCallback(async () => {
-    if (ortRef.current) return;
+  const initLiteRT = useCallback(async () => {
+    if (runtimeRef.current) return;
     if (!initPromiseRef.current) {
       setIsLoading(true);
       const initPromise = (async () => {
         try {
-          const back = detectBackend();
-          setBackend(back);
-          const ort = await loadONNX();
-          ortRef.current = ort;
+          const runtime = await loadLiteRT();
+          runtimeRef.current = runtime;
         } finally {
           setIsLoading(false);
         }
@@ -75,9 +71,9 @@ export function useONNX(): UseONNXReturn {
         setModelProgress(0);
       }
       try {
-        if (!ortRef.current) await initONNX();
+        if (!runtimeRef.current) await initLiteRT();
         const session = await createSession(
-          ortRef.current,
+          runtimeRef.current,
           key,
           undefined,
           showProgressUI ? setModelProgress : undefined,
@@ -88,13 +84,7 @@ export function useONNX(): UseONNXReturn {
           return false;
         }
         sessionRef.current = session;
-        const tagged: string | undefined = (session as any)?.__engine;
-        const eps: string[] = (session as any)?.handler?.executionProviders ?? [];
-        const engine: 'wasm' | 'webgpu' =
-          tagged === 'webgpu' || eps.some((ep) => ep.toLowerCase().includes('webgpu'))
-            ? 'webgpu'
-            : 'wasm';
-        setExecEngine(engine);
+        setExecEngine((session as any).__engine);
         return true;
       } catch (e) {
         if (!controller.signal.aborted) console.error('Failed to load model:', e);
@@ -115,7 +105,7 @@ export function useONNX(): UseONNXReturn {
         modelLoadsRef.current.delete(key);
       }
     }
-  }, [initONNX]);
+  }, [initLiteRT]);
 
   const unloadModel = useCallback(async () => {
     sessionGenerationRef.current += 1;
@@ -131,5 +121,5 @@ export function useONNX(): UseONNXReturn {
     if (session?.release) await session.release();
   }, []);
 
-  return { ortRef, backend, execEngine, sessionRef, isLoading, modelProgress, initONNX, loadModel, unloadModel };
+  return { runtimeRef, execEngine, sessionRef, isLoading, modelProgress, initLiteRT, loadModel, unloadModel };
 }

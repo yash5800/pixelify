@@ -1,15 +1,15 @@
 import { useCallback } from 'react';
 import { MODELS, MAX_OUTPUT_DIM } from '../lib/constants';
-import { 
-  extractYCbCr, 
-  extractRGB, 
-  mergeToRgba, 
-  rgbaFromTensor, 
-  resizeChannel, 
-  applyCanvasEnhancements,
+import {
+  extractYCbCr,
+  extractRGB,
+  mergeToRgba,
+  rgbaFromTensor,
+  resizeChannel,
   upscaleWithCanvas,
 } from '../utils/imageProcessing';
-import { runPass, createSession, loadONNX } from '../utils/upscale';
+import { runPass, createSession, loadLiteRT } from '../utils/upscale';
+import { processFinalImage } from '../utils/upscaler/postprocess';
 import type { ModelKey, UpscaleResult, ProgressState, EnhancementOptions } from '../types';
 
 /* ============================================================
@@ -36,7 +36,7 @@ class CancellationError extends Error {
 }
 
 interface UseUpscaleParams {
-  ortRef: React.MutableRefObject<any>;
+  runtimeRef: React.MutableRefObject<any>;
   sessionRef: React.MutableRefObject<any>;
 }
 
@@ -50,7 +50,7 @@ interface UseUpscaleReturn {
   ) => Promise<UpscaleResult>;
 }
 
-export function useUpscale({ ortRef, sessionRef }: UseUpscaleParams): UseUpscaleReturn {
+export function useUpscale({ runtimeRef, sessionRef }: UseUpscaleParams): UseUpscaleReturn {
   const upscale = useCallback(
     async (
       id: string,
@@ -72,6 +72,17 @@ export function useUpscale({ ortRef, sessionRef }: UseUpscaleParams): UseUpscale
       const start = performance.now();
       const run = { cancelled: false };
       activeRuns.set(id, run);
+      let activeSession: any = sessionRef.current?.__modelKey === modelKey ? sessionRef.current : null;
+      let latestProgress: ProgressState = { percent: 0, text: '' };
+      const reportProgress = (progress: ProgressState) => {
+        latestProgress = progress;
+        onProgress({
+          ...progress,
+          engine: activeSession?.__engine,
+          engineFallback: activeSession?.__fallback ?? false,
+          engineFallbackReason: activeSession?.__fallbackReason,
+        });
+      };
 
       /** Throw as soon as a cancel was requested for this run. */
       const checkCancelled = () => {
@@ -104,15 +115,15 @@ export function useUpscale({ ortRef, sessionRef }: UseUpscaleParams): UseUpscale
         `Generating high-res ${finalW}×${finalH} output tensor...`
       ];
 
-      onProgress({ percent: 10, text: steps[0], stepIndex: 1, totalSteps: steps.length });
+      reportProgress({ percent: 10, text: steps[0], stepIndex: 1, totalSteps: steps.length });
       await new Promise((r) => setTimeout(r, 100));
       checkCancelled();
 
-      let ort = ortRef.current;
-      if (!ort) {
-        onProgress({ percent: 12, text: 'Initializing ONNX runtime...', stepIndex: 1, totalSteps: steps.length });
-        ort = await loadONNX();
-        ortRef.current = ort;
+      let runtime = runtimeRef.current;
+      if (!runtime) {
+        reportProgress({ percent: 12, text: 'Initializing LiteRT.js...', stepIndex: 1, totalSteps: steps.length });
+        runtime = await loadLiteRT();
+        runtimeRef.current = runtime;
       }
 
       let session = sessionRef.current;
@@ -121,28 +132,31 @@ export function useUpscale({ ortRef, sessionRef }: UseUpscaleParams): UseUpscale
       // CRITICAL: Guarantee the session matches the selected modelKey!
       if (!session || (session as any).__modelKey !== modelKey) {
         const onLoadProgress = (pct: number) =>
-          onProgress({
+          reportProgress({
             percent: 12 + Math.round(pct * 0.12),
             text: `Loading ${m.name}… ${Math.round(pct)}%`,
             stepIndex: 1,
             totalSteps: steps.length,
           });
-        onProgress({ percent: 12, text: `Loading ${m.name}… 0%`, stepIndex: 1, totalSteps: steps.length });
+        reportProgress({ percent: 12, text: `Loading ${m.name}… 0%`, stepIndex: 1, totalSteps: steps.length });
         try {
-          session = await createSession(ort, modelKey, undefined, onLoadProgress);
+          session = await createSession(runtime, modelKey, undefined, onLoadProgress);
           sessionRef.current = session;
+          activeSession = session;
+          reportProgress(latestProgress);
         } catch (loadErr) {
-          console.warn(`Failed to create session for ${modelKey}, trying WASM fallback:`, loadErr);
-          session = await createSession(ort, modelKey, 'wasm', onLoadProgress);
-          sessionRef.current = session;
+          console.warn(`Failed to create LiteRT session for ${modelKey}:`, loadErr);
+          throw loadErr;
         }
       }
+      activeSession = session;
+      reportProgress(latestProgress);
 
       let rawRgba: Uint8ClampedArray;
       let outW = finalW;
       let outH = finalH;
 
-      if (ort && session) {
+      if (runtime && session) {
         try {
           // Native 4x models. Run 1 pass for 4x and 2x (downscaled after).
           // Allow 2 passes for 8x only on small images (<= 256px) to avoid massive OOM explosion.
@@ -159,13 +173,15 @@ export function useUpscale({ ortRef, sessionRef }: UseUpscaleParams): UseUpscale
           let cw = img.width;
           let ch = img.height;
 
-          onProgress({ percent: 25, text: steps[1], stepIndex: 2, totalSteps: steps.length });
+          reportProgress({ percent: 25, text: steps[1], stepIndex: 2, totalSteps: steps.length });
           await new Promise((r) => setTimeout(r, 80));
           checkCancelled();
 
           const onSessionUpdated = (newSession: any) => {
             session = newSession;
             sessionRef.current = newSession;
+            activeSession = newSession;
+            reportProgress(latestProgress);
           };
 
           if (m.color === 'rgb') {
@@ -173,7 +189,7 @@ export function useUpscale({ ortRef, sessionRef }: UseUpscaleParams): UseUpscale
             for (let pass = 0; pass < numPasses; pass++) {
               checkCancelled();
               data = await runPass(
-                ort,
+                runtime,
                 session,
                 data,
                 cw,
@@ -182,7 +198,7 @@ export function useUpscale({ ortRef, sessionRef }: UseUpscaleParams): UseUpscale
                 numPasses,
                 modelKey,
                 (pct, txt) =>
-                  onProgress({
+                  reportProgress({
                     percent: Math.min(82, 25 + Math.round(pct * 0.57)),
                     text: `${steps[3]} (${txt})`,
                     stepIndex: 3,
@@ -205,7 +221,7 @@ export function useUpscale({ ortRef, sessionRef }: UseUpscaleParams): UseUpscale
               Cb = resizeChannel(Cb, cw, ch, passDstW, passDstH);
               Cr = resizeChannel(Cr, cw, ch, passDstW, passDstH);
               Y = await runPass(
-                ort,
+                runtime,
                 session,
                 Y,
                 cw,
@@ -214,7 +230,7 @@ export function useUpscale({ ortRef, sessionRef }: UseUpscaleParams): UseUpscale
                 numPasses,
                 modelKey,
                 (pct, txt) =>
-                  onProgress({
+                  reportProgress({
                     percent: Math.min(82, 25 + Math.round(pct * 0.57)),
                     text: `${steps[3]} (${txt})`,
                     stepIndex: 4,
@@ -232,59 +248,43 @@ export function useUpscale({ ortRef, sessionRef }: UseUpscaleParams): UseUpscale
         } catch (e: any) {
           // A cancel must never fall back into a full canvas re-render.
           if (run.cancelled || e?.name === 'CancellationError') throw e;
-          console.error('[useUpscale] ONNX INFERENCE ERROR:', e?.message || e, e?.stack);
-          const fallback = upscaleWithCanvas(img, scale, options);
+          console.error('[useUpscale] LiteRT inference error:', e?.message || e, e?.stack);
+          activeSession = {
+            __engine: 'canvas',
+            __fallback: true,
+            __fallbackReason: e instanceof Error ? e.message : String(e),
+          };
+          reportProgress({ percent: 82, text: 'Using canvas fallback after LiteRT error', stepIndex: 4, totalSteps: steps.length });
+          const fallback = upscaleWithCanvas(img, scale);
           rawRgba = fallback.rgba;
           outW = fallback.width;
           outH = fallback.height;
         }
       } else {
-        console.warn('[useUpscale] Ort or session missing! ort:', !!ort, 'session:', !!session);
+        console.warn('[useUpscale] LiteRT runtime or session missing!', !!runtime, !!session);
         // High quality local super-sampling
-        onProgress({ percent: 50, text: steps[2], stepIndex: 3, totalSteps: steps.length });
+        activeSession = { __engine: 'canvas', __fallback: true, __fallbackReason: 'LiteRT session is unavailable.' };
+        reportProgress({ percent: 50, text: steps[2], stepIndex: 3, totalSteps: steps.length });
         await new Promise((r) => setTimeout(r, 200));
         checkCancelled();
-        const res = upscaleWithCanvas(img, scale, options);
+        const res = upscaleWithCanvas(img, scale);
         rawRgba = res.rgba;
         outW = res.width;
         outH = res.height;
       }
 
-      onProgress({ percent: 88, text: steps[4], stepIndex: 5, totalSteps: steps.length });
+      reportProgress({ percent: 88, text: steps[4], stepIndex: 5, totalSteps: steps.length });
       await new Promise((r) => setTimeout(r, 120));
       checkCancelled();
 
       // Unregister before the final non-cancellable encoding step.
       activeRuns.delete(id);
 
-      // Final canvas buffer post-processing & exact target scale fitting
-      let finalCanvas = document.createElement('canvas');
-      finalCanvas.width = outW;
-      finalCanvas.height = outH;
-      const fCtx = finalCanvas.getContext('2d', { willReadFrequently: true })!;
-      fCtx.putImageData(new ImageData(new Uint8ClampedArray(rawRgba), outW, outH), 0, 0);
+      // Resize → enhance → PNG encode all happen off the page thread (worker
+      // with OffscreenCanvas), falling back to a main-thread canvas when the
+      // worker cannot be used. rawRgba's buffer is transferred there.
+      const finalized = await processFinalImage(rawRgba, outW, outH, finalW, finalH, options);
 
-      // If neural output dimensions differ from requested target (e.g. 2x requested from a 4x model, or 8x),
-      // cleanly scale to finalW × finalH using high-quality image smoothing.
-      if (outW !== finalW || outH !== finalH) {
-        const scaledCanvas = document.createElement('canvas');
-        scaledCanvas.width = finalW;
-        scaledCanvas.height = finalH;
-        const sCtx = scaledCanvas.getContext('2d')!;
-        sCtx.imageSmoothingEnabled = true;
-        sCtx.imageSmoothingQuality = 'high';
-        sCtx.drawImage(finalCanvas, 0, 0, finalW, finalH);
-        finalCanvas = scaledCanvas;
-        outW = finalW;
-        outH = finalH;
-      }
-
-      applyCanvasEnhancements(finalCanvas, options);
-      checkCancelled();
-
-      const finalCtx = finalCanvas.getContext('2d', { willReadFrequently: true })!;
-      const finalImgData = finalCtx.getImageData(0, 0, outW, outH);
-      const dataUrl = finalCanvas.toDataURL('image/png');
       const elapsed = Math.max(120, Math.round(performance.now() - start));
 
       const psnrGain = `+${(12.5 + scale * 1.8).toFixed(1)} dB`;
@@ -292,17 +292,19 @@ export function useUpscale({ ortRef, sessionRef }: UseUpscaleParams): UseUpscale
 
       return {
         type: 'upscale',
-        rgba: finalImgData.data,
-        width: outW,
-        height: outH,
+        blobUrl: finalized.blobUrl,
+        width: finalized.width,
+        height: finalized.height,
         time: elapsed,
         psnrGain,
         detailGain,
         enhancementsApplied,
-        dataUrl
+        engine: activeSession?.__engine,
+        engineFallback: activeSession?.__fallback ?? false,
+        engineFallbackReason: activeSession?.__fallbackReason,
       };
     },
-    [ortRef, sessionRef],
+    [runtimeRef, sessionRef],
   );
 
   return { upscale };

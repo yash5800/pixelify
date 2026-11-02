@@ -14,7 +14,7 @@ const IMG_S1 = '/bgremove/samples/s1.png';
 const IMG_S2 = '/bgremove/samples/s2.png';
 const IMG_S3 = '/bgremove/samples/s3.png';
 const IMG_PAIR_BEFORE = '/gta6.jpg';   // real before shot
-const IMG_PAIR_AFTER = '/gta6.png';    // real transparent cutout
+const IMG_PAIR_AFTER = '/gta6-cutout.png';    // real transparent cutout
 const IMG_CUTOUT_STANDALONE = '/bgremove/watch.png';
 const IMG_CUTOUT_STANDALONE2 = '/bgremove/black-widow.png';
 const IMG_CUTOUT_STANDALONE3 = '/bgremove/roronova.png';
@@ -165,15 +165,25 @@ export const BgPipeline: React.FC = () => {
    ============================================================ */
 const Lens: React.FC<{ before: string; after: string }> = ({ before, after }) => {
   const [cut, setCut] = useState(50);
-  const [ar, setAr] = useState(4 / 3);
+  // Default to actual GTA pair aspect ratio (1680x2100 -> 0.8) so it never scales or shifts on initial load or reload
+  const [ar, setAr] = useState(1680 / 2100);
   const frameRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
   const dragging = useRef(false);
 
   /* frame follows the image's real aspect ratio so nothing is cropped */
-  const measure = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    const img = e.currentTarget;
-    if (img.naturalWidth && img.naturalHeight) setAr(img.naturalWidth / img.naturalHeight);
-  };
+  const measure = useCallback((img: HTMLImageElement) => {
+    if (img.naturalWidth && img.naturalHeight) {
+      setAr(img.naturalWidth / img.naturalHeight);
+    }
+  }, []);
+
+  /* check if the image was already loaded from cache on page reload */
+  useEffect(() => {
+    if (imgRef.current && imgRef.current.complete) {
+      measure(imgRef.current);
+    }
+  }, [after, measure]);
 
   const move = useCallback((clientX: number) => {
     const el = frameRef.current;
@@ -199,9 +209,22 @@ const Lens: React.FC<{ before: string; after: string }> = ({ before, after }) =>
         onPointerUp={() => { dragging.current = false; }}
         onPointerCancel={() => { dragging.current = false; }}
       >
-        <img src={after} alt="Cutout result" loading="lazy" draggable={false} onLoad={measure} />
+        <img
+          ref={imgRef}
+          src={after}
+          alt="Cutout result"
+          loading="lazy"
+          draggable={false}
+          onLoad={(e) => measure(e.currentTarget)}
+        />
         <div className="bgr-lens-before" style={{ clipPath: `inset(0 calc(100% - ${cut}%) 0 0)` }}>
-          <img src={before} alt="Original" loading="lazy" draggable={false} />
+          <img
+            src={before}
+            alt="Original"
+            loading="lazy"
+            draggable={false}
+            onLoad={(e) => measure(e.currentTarget)}
+          />
         </div>
         <span className="bgr-lens-handle" style={{ left: `${cut}%` }}>
           <span className="bgr-lens-knob"><MoveHorizontal size={15} strokeWidth={2.4} /></span>

@@ -93,7 +93,8 @@ export default function Navbar({
   const { warmup, isMobileSidebarOpen: ctxMobileOpen } = useApp();
   const isMobileMenuOpen = isMobileSidebarOpen || ctxMobileOpen || false;
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
+  const [isNavHidden, setIsNavHidden] = useState(false);
+  const lastScrollY = useRef(0);
   const settingsRef = useRef<HTMLDivElement>(null);
 
   /* DESKTOP ACTIVE PILL — CSS transform transition (compositor-driven).
@@ -208,19 +209,31 @@ export default function Navbar({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Track scroll position to adjust header elevation
+  // Hide the navbar while scrolling down, and reveal it as soon as scrolling
+  // moves upward. Keep it available at the top and while the mobile menu is open.
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
+      const currentScrollY = Math.max(0, window.scrollY);
+      const delta = currentScrollY - lastScrollY.current;
+
+      if (currentScrollY <= 24) {
+        setIsNavHidden(false);
+      } else if (delta > 1) {
+        setIsNavHidden(true);
+      } else if (delta < -1) {
+        setIsNavHidden(false);
+      }
+
+      lastScrollY.current = currentScrollY;
     };
-    handleScroll();
+    lastScrollY.current = window.scrollY;
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   return (
     <>
-      <header className={`sticky top-0 inset-x-0 z-[60] w-full select-none py-3.5 bg-transparent border-none pointer-events-none transition-all duration-300 ${mobileHidden ? 'max-lg:hidden' : ''}`}>
+      <header className={`sticky top-0 inset-x-0 z-[60] w-full select-none py-3.5 bg-transparent border-none pointer-events-none transform-gpu transition-transform duration-300 ease-out will-change-transform ${isNavHidden && !isMobileMenuOpen ? '-translate-y-full' : 'translate-y-0'} ${mobileHidden ? 'max-lg:hidden' : ''}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-8 flex items-center justify-between gap-4 relative">
 
           {/* MOBILE SIDEBAR MENU BUTTON (< md): opens the navigation sidebar drawer */}

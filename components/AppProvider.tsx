@@ -29,7 +29,7 @@ import type {
   ModelDownloadItem,
 } from '../types';
 import { makeId } from '../lib/bgUtils';
-import { useONNX } from '../hooks/useONNX';
+import { useLiteRT } from '../hooks/useLiteRT';
 import { isUpscalerModelCached } from '../utils/upscale';
 import { useUpscale, cancelUpscale } from '../hooks/useUpscale';
 import { bgRemoverService } from '../services/bgRemoverService';
@@ -208,13 +208,14 @@ export default function AppProvider({ children }: { children: React.ReactNode })
   const [bgJobs, setBgJobs] = useState<BGJob[]>([]);
 
   // Upscaler State Hooks
-  const { ortRef, execEngine, sessionRef, isLoading: modelLoading, modelProgress, initONNX, loadModel, unloadModel } = useONNX();
-  const { upscale } = useUpscale({ ortRef, sessionRef });
+  const { runtimeRef, execEngine, sessionRef, isLoading: modelLoading, modelProgress, initLiteRT, loadModel, unloadModel } = useLiteRT();
+  const { upscale } = useUpscale({ runtimeRef, sessionRef });
 
   // LIVE ENGINE STATE — what each tool's pipeline is ACTUALLY running on right now.
   const [bgEngine, setBgEngine] = useState<'wasm' | 'webgpu' | null>(null);
   const [bgWebgpuAvailable, setBgWebgpuAvailable] = useState<boolean>(false);
   const [webgpuAvailable, setWebgpuAvailable] = useState<boolean | null>(null);
+  const [bgModelLoadName, setBgModelLoadName] = useState<"Chopper" | "Diablo">("Chopper");
   const [bgModelPhase, setBgModelPhase] = useState<'idle' | 'detecting' | 'downloading' | 'preparing' | 'ready' | 'error'>('idle');
   const [bgModelProgress, setBgModelProgress] = useState(0);
   const [bgFallbackReason, setBgFallbackReason] = useState<string | null>(null);
@@ -279,10 +280,28 @@ export default function AppProvider({ children }: { children: React.ReactNode })
 
   // Service Worker registration & Route prefetching for offline resilience
   useEffect(() => {
-    if (typeof window !== 'undefined' && 'serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
-      navigator.serviceWorker.register('/sw.js').catch((err) => {
-        console.debug('ServiceWorker registration skipped or failed:', err);
-      });
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      if (process.env.NODE_ENV === 'production') {
+        navigator.serviceWorker.register('/sw.js').catch((err) => {
+          console.debug('ServiceWorker registration skipped or failed:', err);
+        });
+      } else {
+        // In development, unregister any active service worker and clear cache to avoid stale chunk caching and hydration mismatches
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (const registration of registrations) {
+            registration.unregister();
+          }
+        });
+        if ('caches' in window) {
+          caches.keys().then((keys) => {
+            for (const key of keys) {
+              if (key.startsWith('pixelify-cache')) {
+                caches.delete(key);
+              }
+            }
+          });
+        }
+      }
     }
 
     try {
@@ -364,15 +383,16 @@ export default function AppProvider({ children }: { children: React.ReactNode })
     const unsubscribe = bgRemoverService.subscribeState((state) => {
       setBgModelPhase(state.phase);
       setBgModelProgress(state.progress);
+      setBgModelLoadName(state.model === "diablo" ? "Diablo" : "Chopper");
       setBgFallbackReason(state.fallbackReason);
       setBgEngine(state.phase === 'idle' || state.phase === 'detecting' || state.phase === 'error'
         ? null
         : state.engine);
       setBgWebgpuAvailable(state.webgpuAvailable);
       // Cached heavyweight weights report a single 100% "progress" tick per
-        // file, which would make the badge flicker on/off between files.
-        // A real transfer passes through sub-95% values first — only then
-        // do we surface the row, and keep it up until the phase changes.
+      // file, which would make the badge flicker on/off between files.
+      // A real transfer passes through sub-95% values first — only then
+      // do we surface the row, and keep it up until the phase changes.
       if (state.phase === 'downloading') {
         if (state.progress > 0 && state.progress < 95) bgRealDownloadRef.current = true;
         if (bgRealDownloadRef.current) setBgDownloadActive(true);
@@ -433,7 +453,7 @@ export default function AppProvider({ children }: { children: React.ReactNode })
           if (!cached) targets.push(key);
         }
         if (targets.length > 0) setUpscalerPreloadQueue(targets);
-        await initONNX();
+        await initLiteRT();
         if (cancelled || preloadCancelledRef.current) return;
         // Pre-warm ONLY the default upscaler model (Vitality). Heavy
         // variants (Pixel-Dance, Alpha-Satoru) stay on-demand.
@@ -470,7 +490,7 @@ export default function AppProvider({ children }: { children: React.ReactNode })
       if (idleId !== null) cancelIdleCallback?.(idleId);
       if (timerId !== null) window.clearTimeout(timerId);
     };
-  }, [addToast, initONNX, loadModel, unloadModel]);
+  }, [addToast, initLiteRT, loadModel, unloadModel]);
 
   const handleClearModelCache = useCallback(async () => {
     if (isClearingModelCache) return;
@@ -497,20 +517,20 @@ export default function AppProvider({ children }: { children: React.ReactNode })
     }
   }, [addToast, isClearingModelCache, unloadModel]);
 
-/** Marks which upscaler model the navbar badge should currently label. */
-const setActiveUpscalerModel = (key: ModelKey) => {
-  setUpscalerActiveKey(key);
-  setUpscalerActiveName(MODELS[key].name);
-};
+  /** Marks which upscaler model the navbar badge should currently label. */
+  const setActiveUpscalerModel = (key: ModelKey) => {
+    setUpscalerActiveKey(key);
+    setUpscalerActiveName(MODELS[key].name);
+  };
 
-/* ----------------------------------------------------------
-   MODEL WARMUP (hover-intent preloading)
-     The idle preload covers most visits, but a user hovering a
-     CTA before that fires gets the runtime + model moving right
-     away instead of on click. Fully idempotent: init/load paths
-     guard themselves, and failures stay silent here (the click
-     path surfaces real errors).
-     ---------------------------------------------------------- */
+  /* ----------------------------------------------------------
+     MODEL WARMUP (hover-intent preloading)
+       The idle preload covers most visits, but a user hovering a
+       CTA before that fires gets the runtime + model moving right
+       away instead of on click. Fully idempotent: init/load paths
+       guard themselves, and failures stay silent here (the click
+       path surfaces real errors).
+       ---------------------------------------------------------- */
   const warmup = useCallback(
     (tab: ViewTab) => {
       try {
@@ -519,7 +539,7 @@ const setActiveUpscalerModel = (key: ModelKey) => {
           if (!sessionRef.current && !modelLoading) {
             void (async () => {
               try {
-                await initONNX();
+                await initLiteRT();
                 setActiveUpscalerModel('vitality');
                 await loadModel('vitality', { silentIfCached: true });
               } catch { /* silent: click path handles errors */ }
@@ -530,7 +550,7 @@ const setActiveUpscalerModel = (key: ModelKey) => {
         }
       } catch { /* silent */ }
     },
-    [initONNX, loadModel, modelLoading, sessionRef]
+    [initLiteRT, loadModel, modelLoading, sessionRef]
   );
 
   /* ----------------------------------------------------------
@@ -554,10 +574,14 @@ const setActiveUpscalerModel = (key: ModelKey) => {
     // Cached Chopper reports a 100% progress tick — that's not a download;
     // bgDownloadActive goes true only once a real <95% transfer tick lands.
     if (bgModelPhase === 'downloading' && bgDownloadActive) {
-      out.push({ id: 'bg-remove', name: 'Chopper · BG remover', progress: Math.round(bgModelProgress) });
+      out.push({
+        id: 'bg-remove',
+        name: bgModelLoadName === 'Diablo' ? 'Diablo · BG remover (premium)' : 'Chopper · BG remover',
+        progress: Math.round(bgModelProgress),
+      });
     }
     return out;
-  }, [modelLoading, modelProgress, upscalerActiveName, upscalerActiveKey, upscalerPreloadQueue, bgModelPhase, bgModelProgress, bgDownloadActive]);
+  }, [modelLoading, modelProgress, upscalerActiveName, upscalerActiveKey, upscalerPreloadQueue, bgModelPhase, bgModelProgress, bgDownloadActive, bgModelLoadName]);
 
   /* ----------------------------------------------------------
      ADD UPSCALE FILE (Creates individual UpscaleItem)
@@ -577,7 +601,7 @@ const setActiveUpscalerModel = (key: ModelKey) => {
         addToast(
           'info',
           supports2x
-             ? `Image too large for 4x/8x. Select 2x to stay within the limit.`
+            ? `Image too large for 4x/8x. Select 2x to stay within the limit.`
             : `Choose 2x to stay under the limit.`
         );
       }
@@ -700,7 +724,8 @@ const setActiveUpscalerModel = (key: ModelKey) => {
       primeAudio();
       requestNotificationPermission().catch(() => { });
 
-      // Mark ONLY this specific item as processing
+      // A rerun replaces the previous result — drop its object URL first.
+      if (item.result?.blobUrl) URL.revokeObjectURL(item.result.blobUrl);
       setItems((prev) =>
         prev.map((i) =>
           i.id === id
@@ -734,7 +759,13 @@ const setActiveUpscalerModel = (key: ModelKey) => {
                 ...i,
                 status: 'completed',
                 result: res,
-                progress: { percent: 100, text: 'Complete!' },
+                progress: {
+                  percent: 100,
+                  text: 'Complete!',
+                  engine: res.engine,
+                  engineFallback: res.engineFallback,
+                  engineFallbackReason: res.engineFallbackReason,
+                },
               }
               : i
           )
@@ -812,6 +843,8 @@ const setActiveUpscalerModel = (key: ModelKey) => {
      ---------------------------------------------------------- */
   const handleRemoveItem = useCallback(
     (id: string) => {
+      const removed = items.find((i) => i.id === id);
+      if (removed?.result?.blobUrl) URL.revokeObjectURL(removed.result.blobUrl);
       setItems((prev) => {
         const next = prev.filter((i) => i.id !== id);
         if (next.length === 0) {
@@ -827,10 +860,13 @@ const setActiveUpscalerModel = (key: ModelKey) => {
   );
 
   const handleClearAll = useCallback(() => {
+    for (const item of items) {
+      if (item.result?.blobUrl) URL.revokeObjectURL(item.result.blobUrl);
+    }
     setItems([]);
     setSelectedId(null);
     setStep('upload');
-  }, []);
+  }, [items]);
 
   /* ----------------------------------------------------------
      EXIT WORKSPACE (mobile X / desktop close) — back to upload.
@@ -852,36 +888,52 @@ const setActiveUpscalerModel = (key: ModelKey) => {
      DOWNLOAD RESULT (Per image)
      ---------------------------------------------------------- */
   const handleDownloadItem = useCallback(
-    (id: string, format: 'png' | 'webp' | 'jpeg' = 'png') => {
+    async (id: string, format: 'png' | 'webp' | 'jpeg' = 'png') => {
       const item = items.find((i) => i.id === id);
-      if (!item || !item.result) return;
-      const res = item.result;
-      const canvas = document.createElement('canvas');
-      canvas.width = res.width;
-      canvas.height = res.height;
-      const ctx = canvas.getContext('2d')!;
-      const rgbaClone = new Uint8ClampedArray(res.rgba);
-      ctx.putImageData(new ImageData(rgbaClone, res.width, res.height), 0, 0);
-
-      const mime = format === 'webp' ? 'image/webp' : format === 'jpeg' ? 'image/jpeg' : 'image/png';
+      const res = item?.result;
+      const resultUrl = res?.blobUrl;
+      if (!item || !res || !resultUrl) return;
+      const baseName = item.name.replace(/\.[^/.]+$/, '');
       const ext = format === 'webp' ? 'webp' : format === 'jpeg' ? 'jpg' : 'png';
 
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) return;
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          const baseName = item.name.replace(/\.[^/.]+$/, '');
-          a.download = `${baseName}_upscaled_${item.options.scale}x.${ext}`;
-          a.click();
-          URL.revokeObjectURL(url);
-        },
-        mime,
-        0.95
-      );
+      const triggerDownload = (url: string) => {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${baseName}_upscaled_${item.options.scale}x.${ext}`;
+        a.click();
+      };
+
+      if (format === 'png') {
+        triggerDownload(resultUrl);
+        return;
+      }
+
+      try {
+        const blob = await (await fetch(resultUrl)).blob();
+        const bitmap = await createImageBitmap(blob);
+        const canvas = document.createElement('canvas');
+        canvas.width = res.width;
+        canvas.height = res.height;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(bitmap, 0, 0, res.width, res.height);
+        bitmap.close?.();
+        canvas.toBlob(
+          (out) => {
+            if (!out) return;
+            const url = URL.createObjectURL(out);
+            triggerDownload(url);
+            URL.revokeObjectURL(url);
+          },
+          format === 'webp' ? 'image/webp' : 'image/jpeg',
+          0.95,
+        );
+      } catch (err) {
+        console.warn(`Re-encoding to ${format.toUpperCase()} failed; saving PNG instead.`, err);
+        addToast('error', `Could not export as ${format.toUpperCase()}; saved the PNG instead.`);
+        triggerDownload(resultUrl);
+      }
     },
-    [items]
+    [items, addToast]
   );
 
   // Global File Picker Handler for BG Remove
@@ -962,24 +1014,24 @@ const setActiveUpscalerModel = (key: ModelKey) => {
   const modelStatus = bgFallbackReason && bgEngine === 'wasm'
     ? `Standard mode: ${bgFallbackReason.slice(0, 110)}`
     : bgModelPhase === 'downloading'
-    ? `Downloading background-removal model (${Math.round(bgModelProgress)}%)`
-    : bgModelPhase === 'preparing'
-      ? 'Preparing background-removal model'
-      : bgModelPhase === 'detecting'
-        ? 'Checking graphics adapter'
-        : bgModelPhase === 'error'
-          ? 'Background model preload failed; it will retry when used'
-          : modelLoading
-            ? `Preparing upscaler model${modelProgress === null ? '' : ` (${Math.round(modelProgress)}%)`}`
-            : upscalerPreloadError && !execEngine
-              ? 'Upscaler model preload failed; it will retry when used'
-              : bgModelPhase === 'ready' && execEngine
-                ? 'Default AI models are ready in this browser'
-                : modelsCleared && execEngine
-                  ? 'Upscaler model ready; other models load when used'
-                  : modelsCleared
-                    ? 'Models cleared; they will download again when needed'
-                    : 'Preparing AI models in the background';
+      ? `Downloading background-removal model (${Math.round(bgModelProgress)}%)`
+      : bgModelPhase === 'preparing'
+        ? 'Preparing background-removal model'
+        : bgModelPhase === 'detecting'
+          ? 'Checking graphics adapter'
+          : bgModelPhase === 'error'
+            ? 'Background model preload failed; it will retry when used'
+            : modelLoading
+              ? `Preparing upscaler model${modelProgress === null ? '' : ` (${Math.round(modelProgress)}%)`}`
+              : upscalerPreloadError && !execEngine
+                ? 'Upscaler model preload failed; it will retry when used'
+                : bgModelPhase === 'ready' && execEngine
+                  ? 'Default AI models are ready in this browser'
+                  : modelsCleared && execEngine
+                    ? 'Upscaler model ready; other models load when used'
+                    : modelsCleared
+                      ? 'Models cleared; they will download again when needed'
+                      : 'Preparing AI models in the background';
   const canClearModelCache = !bgJobs.some((job) => job.status === 'loading' || job.status === 'processing')
     && !items.some((item) => item.status === 'processing')
     && !isClearingModelCache;
@@ -994,7 +1046,7 @@ const setActiveUpscalerModel = (key: ModelKey) => {
 
   const mobileHidden = activeTab === 'upscaler' && step !== 'upload';
 
-  const value: AppContextValue = {
+  const value = useMemo<AppContextValue>(() => ({
     activeTab,
     navigateTo,
     warmup,
@@ -1038,7 +1090,19 @@ const setActiveUpscalerModel = (key: ModelKey) => {
     isMobileSidebarOpen: isMobileNavOpen,
     mobileHidden,
     isOnline,
-  };
+  }), [
+    activeTab, navigateTo, warmup, modelDownloads, addToast, openPicker,
+    bgJobs, bgEngine, setBgJobs, setBgEngine, setBgWebgpuAvailable,
+    handleBGFiles, loadBgSample, handleSelectSample,
+    step, items, selectedId, setSelectedId, addUpscaleFile,
+    modelLoading, modelProgress, execEngine,
+    handleItemModelChange, handleItemOptionsChange, handleResetItemSettings,
+    handleUpscaleItem, handleCancelUpscale, handleDownloadItem,
+    handleRemoveItem, handleClearAll, handleExitWorkspace,
+    webgpuAvailable, modelStatus, isClearingModelCache, canClearModelCache,
+    handleClearModelCache, onOpenMobileSidebar, mobileHidden,
+    isOnline, isOfflineBannerOpen, justReconnected, setIsOfflineBannerOpen,
+  ]);
 
   return (
     <AppContext.Provider value={value}>

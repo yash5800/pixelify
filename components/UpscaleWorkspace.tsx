@@ -506,7 +506,7 @@ export default function UpscaleWorkspace({
 
   const isProcessing = activeItem.status === "processing";
   const hasResult = activeItem.status === "completed" && !!activeItem.result;
-  const resultUrl = activeItem.result?.dataUrl || "";
+  const resultUrl = activeItem.result?.blobUrl || "";
   const imageUrl = activeItem.url;
   const modelKey = activeItem.modelKey;
   const options = activeItem.options;

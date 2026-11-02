@@ -1,6 +1,6 @@
 export type Step = 'upload' | 'config' | 'processing' | 'result';
-export type Backend = 'webgpu' | 'wasm';
 export type ModelKey = 'vitality' | 'pixel-dance' | 'alpha-satoru';
+export type BgModelKey = 'chopper' | 'diablo';
 export type ScaleFactor = 2 | 4 | 8;
 export type ViewTab = 'home' | 'upscaler' | 'bg_remove' | 'blogs' | 'prompts' | 'batch' | 'static';
 export type ThemeMode = 'dark' | 'light' | 'system';
@@ -88,16 +88,18 @@ export interface EnhancementOptions {
 
 export interface UpscaleResult {
   type: 'upscale';
-  rgba: Uint8ClampedArray;
   width: number;
   height: number;
   time: number;
   psnrGain?: string;
   detailGain?: string;
   enhancementsApplied?: string[];
-  dataUrl?: string;
+  /** Object URL of the encoded PNG blob — revocable, no megabyte base64 copies in state. */
+  blobUrl?: string;
+  engine?: 'webgpu' | 'wasm' | 'canvas';
+  engineFallback?: boolean;
+  engineFallbackReason?: string;
 }
-
 export type ProcessResult = UpscaleResult;
 
 export interface ProgressState {
@@ -105,6 +107,9 @@ export interface ProgressState {
   text: string;
   stepIndex?: number;
   totalSteps?: number;
+  engine?: 'webgpu' | 'wasm' | 'canvas';
+  engineFallback?: boolean;
+  engineFallbackReason?: string;
 }
 
 export interface BatchItem {
@@ -140,6 +145,7 @@ export interface BGJob {
   progress: number;
   message: string;
   elapsedMs?: number;
+  model?: BgModelKey;
 }
 
 export interface ToastMessage {

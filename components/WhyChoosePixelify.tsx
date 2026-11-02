@@ -139,7 +139,7 @@ export default function WhyChoosePixelify() {
               tag="WebGPU + WASM"
               badge="Near-Native"
               title="Raw Hardware Acceleration"
-              description="Direct GPU shaders via ONNX Runtime Web eliminate slow server roundtrips for instant real-time processing."
+              description="Direct GPU shaders via LiteRT and WebGPU eliminate slow server roundtrips for instant real-time processing."
               tone="mint"
               visual={<div className="flex flex-wrap items-center justify-between gap-2 text-xs"><span className="flex items-center gap-2 font-semibold"><Cpu size={15} /> Hardware Engine:</span><span className="rounded-full border border-emerald-300/70 bg-emerald-100/80 px-3 py-1 font-bold text-emerald-800">GPU Core Parallelism</span></div>}
             />

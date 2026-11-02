@@ -11,6 +11,7 @@
   },
   "devDependencies": {
     "@types/node": "26.6.5",
+    "@litertjs/core": "^2.6.0",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "autoprefixer": "^10.5.4",

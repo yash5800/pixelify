@@ -1,13 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Scissors, Image as ImageIcon, Sparkles, SlidersHorizontal, PanelsTopLeft, Columns2, Undo2, Redo2, Download as DownloadIcon, ChevronDown, ZoomIn, ZoomOut, RotateCcw, RotateCw, Crop as CropIcon, Plus, FlipHorizontal, FlipVertical, Check, X, Upload, Copy, Trash2, Layers } from 'lucide-react';
+import { Scissors, Image as ImageIcon, Sparkles, SlidersHorizontal, PanelsTopLeft, Columns2, Undo2, Redo2, Download as DownloadIcon, ChevronDown, ZoomIn, ZoomOut, RotateCcw, RotateCw, Crop as CropIcon, Plus, FlipHorizontal, FlipVertical, Check, X, Upload, Copy, Trash2, Layers, Focus, Zap } from 'lucide-react';
 import UploadArea from './UploadArea';
 import BGComparator, { ImageAdjustments, ImageEffects } from './BGComparator';
 import type { FabricEditMode, FabricCropRatio, FabricImageEditorHandle, SubjectTransform } from './bgremove/FabricImageEditor';
 import { DEFAULT_SUBJECT_TRANSFORM } from './bgremove/FabricImageEditor';
 import { makeId, downloadName } from '../lib/bgUtils';
 import { bgRemoverService } from '../services/bgRemoverService';
-import type { BGJob } from '../types';
+import { BG_MODELS, DEFAULT_BG_MODEL } from '../lib/constants';
+import type { BGJob, BgModelKey } from '../types';
+import { isDiabloModelCached, subscribeToModelCacheCleared } from '../utils/modelCache';
 import {
   TextLayer,
   ElementLayer,
@@ -116,6 +118,9 @@ export default function BGRemoveWorkspace({
   const mobileDownloadMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Cutout & edit options
+  const [bgModelKey, setBgModelKey] = useState<BgModelKey>(DEFAULT_BG_MODEL);
+  const [isDiabloCached, setIsDiabloCached] = useState<boolean>(false);
+  const [showDiabloConfirm, setShowDiabloConfirm] = useState<boolean>(false);
   const [cutoutTool, setCutoutTool] = useState<'erase' | 'restore' | 'move'>('move');
   const [brushSize, setBrushSize] = useState(40);
   const [canUndoEditor, setCanUndoEditor] = useState(false);
@@ -137,6 +142,23 @@ export default function BGRemoveWorkspace({
     setSubjectTransform(DEFAULT_SUBJECT_TRANSFORM);
     setViewportZoom(1);
   }, [selectedId]);
+
+  // Detect whether Diablo model weights are cached offline
+  useEffect(() => {
+    let mounted = true;
+    const checkCache = async () => {
+      const cached = await isDiabloModelCached();
+      if (mounted) setIsDiabloCached(cached);
+    };
+    void checkCache();
+    const unsubscribe = subscribeToModelCacheCleared(() => {
+      if (mounted) setIsDiabloCached(false);
+    });
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, [bgModelKey, selectedId]);
 
   // Background options
   const [selectedBg, setSelectedBg] = useState(COLOR_PRESETS[0]);
@@ -226,6 +248,10 @@ export default function BGRemoveWorkspace({
 
   // Reset stage settings when switching images
   useEffect(() => {
+    setShowDiabloConfirm(false);
+    if (selected?.model) {
+      setBgModelKey(selected.model);
+    }
     setSelectedBg(COLOR_PRESETS[0]);
     setCustomBgColor(undefined);
     setCustomBgImage(undefined);
@@ -260,52 +286,99 @@ export default function BGRemoveWorkspace({
     setJobs((items) => items.map((item) => (item.id === id ? { ...item, ...changes } : item)));
   };
 
-  async function processJob(job: BGJob) {
+  async function processJob(job: BGJob, modelKey: BgModelKey = bgModelKey) {
+    const isDiablo = modelKey === 'diablo';
+    if (isDiablo) {
+      console.log(`[Diablo Model] 🎯 Taking Diablo model for job "${job.name}" (ID: ${job.id})`);
+    }
+
+    // If this job has an existing resultUrl (e.g. from a previous model run), revoke it immediately from RAM
+    if (job.resultUrl && job.resultUrl.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(job.resultUrl);
+        console.log(`[Pixelify BG] Revoked previous cutout Object URL from RAM.`);
+      } catch { /* best effort */ }
+    }
+
+    // If switching models, terminate old worker to purge its RAM footprint completely
+    if (job.model && job.model !== modelKey) {
+      bgRemoverService.switchModel(modelKey);
+    }
+
     const serviceState = bgRemoverService.getState();
     const isModelReady = serviceState.isReady;
 
-    let currentProgress = isModelReady ? 15 : 5;
+    let currentProgress = isModelReady ? 20 : 6;
     let currentMessage = isModelReady
-      ? 'Analyzing image pixels...'
-      : 'Loading AI vision model weights...';
+      ? 'Analyzing image contours & lighting...'
+      : 'Loading vision model weights...';
+    let lastReportedProgress = currentProgress;
+    let lastReportedMessage = currentMessage;
 
     updateJob(job.id, {
       status: isModelReady ? 'processing' : 'loading',
       progress: currentProgress,
       message: currentMessage,
+      model: modelKey,
+      resultUrl: null,
+      resultBlob: null,
     });
 
     let tickerInterval: ReturnType<typeof setInterval> | null = null;
-    const startTicker = (startPct: number, targetPct = 92) => {
+    const startTicker = (startPct: number) => {
       if (tickerInterval) clearInterval(tickerInterval);
       currentProgress = Math.max(currentProgress, startPct);
+
       tickerInterval = setInterval(() => {
-        if (currentProgress < targetPct) {
-          const remaining = targetPct - currentProgress;
-          const step = Math.max(1, Math.round(remaining * 0.12));
-          currentProgress = Math.min(targetPct, currentProgress + step);
+        let increment: number;
+        if (currentProgress < 40) {
+          increment = isDiablo ? 1.2 : 2.2;
+        } else if (currentProgress < 65) {
+          increment = isDiablo ? 0.65 : 1.4;
+        } else if (currentProgress < 82) {
+          increment = isDiablo ? 0.4 : 0.9;
+        } else if (currentProgress < 90) {
+          increment = isDiablo ? 0.22 : 0.5;
+        } else {
+          // Asymptotically inch towards 96% so it never freezes or stays stuck at 92%
+          increment = Math.max(0.06, (96 - currentProgress) * (isDiablo ? 0.035 : 0.07));
+        }
 
-          let stageMsg = currentMessage;
-          if (currentProgress >= 25 && currentProgress < 50) {
-            stageMsg = 'Detecting subject contours & lighting...';
-          } else if (currentProgress >= 50 && currentProgress < 78) {
-            stageMsg = 'Extracting clean subject cutout...';
-          } else if (currentProgress >= 78) {
-            stageMsg = 'Refining transparent edge detail...';
-          }
-          currentMessage = stageMsg;
+        currentProgress = Math.min(95.8, currentProgress + increment);
 
+        let stageMsg = currentMessage;
+        if (currentProgress < 30) {
+          stageMsg = 'Analyzing image contours & lighting...';
+        } else if (currentProgress < 55) {
+          stageMsg = isDiablo
+            ? 'Diablo neural edge matting in progress...'
+            : 'Neural network segmenting subject...';
+        } else if (currentProgress < 75) {
+          stageMsg = isDiablo
+            ? 'Extracting fine hair, fur & edge transparency...'
+            : 'Extracting clean subject cutout...';
+        } else if (currentProgress < 90) {
+          stageMsg = 'Refining transparent alpha channels...';
+        } else {
+          stageMsg = 'Polishing transparent edge detail...';
+        }
+        currentMessage = stageMsg;
+
+        const rounded = Math.round(currentProgress);
+        if (rounded !== lastReportedProgress || stageMsg !== lastReportedMessage) {
+          lastReportedProgress = rounded;
+          lastReportedMessage = stageMsg;
           updateJob(job.id, {
             status: 'processing',
-            progress: currentProgress,
-            message: currentMessage,
+            progress: rounded,
+            message: stageMsg,
           });
         }
-      }, 110);
+      }, 120);
     };
 
     if (isModelReady) {
-      startTicker(15, 92);
+      startTicker(20);
     }
 
     try {
@@ -313,34 +386,53 @@ export default function BGRemoveWorkspace({
         job.id,
         job.sourceUrl,
         (pct, isWeights) => {
+          if (isDiablo && isWeights) {
+            console.log(`[Diablo Model] 📥 Weights loading progress: ${pct}%`);
+          }
           if (isWeights || pct > 0) {
-            const mapped = Math.min(60, Math.max(5, Math.round(5 + pct * 0.55)));
+            const mapped = Math.min(50, Math.max(6, Math.round(6 + pct * 0.44)));
             currentProgress = Math.max(currentProgress, mapped);
             currentMessage = `Downloading AI vision model (${pct}%)...`;
+            lastReportedProgress = Math.round(currentProgress);
+            lastReportedMessage = currentMessage;
             updateJob(job.id, {
               status: 'loading',
-              progress: currentProgress,
+              progress: lastReportedProgress,
               message: currentMessage,
             });
             if (pct >= 100) {
-              startTicker(65, 92);
+              startTicker(52);
             }
           }
         },
         (stage, msg) => {
-          if (stage === 'running-inference') {
-            startTicker(Math.max(currentProgress, 40), 92);
+          if (isDiablo) {
+            console.log(`[Diablo Model] 🔄 Stage: "${stage}" - "${msg || ''}"`);
+          }
+          if (stage === 'reading-image') {
+            currentMessage = 'Analyzing image contours & lighting...';
+            startTicker(Math.max(currentProgress, 20));
+          } else if (stage === 'loading-diablo') {
+            currentMessage = 'Summoning Diablo inference weights...';
+            startTicker(Math.max(currentProgress, 28));
+          } else if (stage === 'running-inference') {
+            currentMessage = isDiablo
+              ? 'Diablo neural edge matting in progress...'
+              : 'Neural network segmenting subject...';
+            startTicker(Math.max(currentProgress, 35));
           } else if (stage === 'encoding-output') {
             if (tickerInterval) clearInterval(tickerInterval);
-            currentProgress = Math.max(currentProgress, 94);
-            currentMessage = msg || 'Encoding transparent PNG...';
+            currentProgress = Math.max(currentProgress, 95);
+            currentMessage = 'Compositing full-resolution cutout...';
+            lastReportedProgress = 95;
+            lastReportedMessage = currentMessage;
             updateJob(job.id, {
               status: 'processing',
-              progress: currentProgress,
+              progress: 95,
               message: currentMessage,
             });
           }
-        }
+        }, modelKey
       );
 
       if (tickerInterval) clearInterval(tickerInterval);
@@ -348,18 +440,24 @@ export default function BGRemoveWorkspace({
       updateJob(job.id, {
         status: 'processing',
         progress: 98,
-        message: 'Finalizing cutout...',
+        message: 'Finalizing transparent PNG...',
       });
-      await new Promise((r) => setTimeout(r, 140));
+      await new Promise((r) => setTimeout(r, 120));
 
       updateJob(job.id, {
         status: 'processing',
         progress: 100,
         message: 'Cutout complete!',
       });
-      await new Promise((r) => setTimeout(r, 220));
+      await new Promise((r) => setTimeout(r, 180));
 
       const url = URL.createObjectURL(blob);
+
+      if (isDiablo) {
+        setIsDiabloCached(true);
+        console.log(`[Diablo Model] 📦 Cutout output received for "${job.name}": blob size ${(blob.size / 1024).toFixed(1)} KB, elapsed: ${elapsedMs}ms`);
+        console.log(`[Diablo Model] 🔗 Created Object URL:`, url);
+      }
 
       updateJob(job.id, {
         status: 'done',
@@ -368,9 +466,10 @@ export default function BGRemoveWorkspace({
         resultUrl: url,
         resultBlob: blob,
         elapsedMs,
+        model: modelKey,
       });
 
-      addToast('success', `${job.name} background removed!`);
+      addToast('success', `${job.name} background removed with ${BG_MODELS[modelKey].label}!`);
     } catch (err: any) {
       if (tickerInterval) clearInterval(tickerInterval);
       console.error('processJob failed:', err);
@@ -386,16 +485,69 @@ export default function BGRemoveWorkspace({
     }
   }
 
-  // Automatic background removal on upload
-  useEffect(() => {
-    const readyJob = jobs.find((job) => job.status === 'ready');
-    if (readyJob) {
-      setSelectedId(readyJob.id);
-      processJob(readyJob);
+  const handleModelSwitch = (targetModel: BgModelKey) => {
+    if (!selected || selected.status === 'loading' || selected.status === 'processing') return;
+
+    const previousModel: BgModelKey = selected.model || bgModelKey;
+    const previousResultUrl = selected.resultUrl;
+
+    console.log(`[Pixelify BG] Switching model from ${previousModel} to ${targetModel}. Freeing previous model and image cache from RAM...`);
+
+    // 1. Immediately revoke previous output image URL from browser RAM
+    if (previousResultUrl && previousResultUrl.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(previousResultUrl);
+        console.log(`[Pixelify BG] Revoked previous output image Object URL from RAM.`);
+      } catch (err) {
+        console.warn('Failed to revoke previous cutout Object URL:', err);
+      }
     }
-  }, [jobs]);
+
+    // 2. Terminate active worker to purge its entire RAM footprint (WASM heap + WebGPU buffers)
+    bgRemoverService.switchModel(targetModel);
+
+    // 3. Clear previous cutout result from job state to free RAM and reset editor canvas
+    updateJob(selected.id, {
+      resultUrl: null,
+      resultBlob: null,
+      status: 'loading',
+      progress: 0,
+      message: `Switching to ${BG_MODELS[targetModel].label}...`,
+      model: targetModel,
+    });
+
+    setBgModelKey(targetModel);
+
+    // 4. Trigger processJob with clean state
+    const cleanJob: BGJob = {
+      ...selected,
+      resultUrl: null,
+      resultBlob: null,
+      model: targetModel,
+    };
+    processJob(cleanJob, targetModel);
+  };
+
+  const autoProcessingIdsRef = useRef<Set<string>>(new Set());
+
+  // Automatic background removal on upload: automatically runs whichever model is active
+  useEffect(() => {
+    if (!selectedId || !jobs.some((job) => job.id === selectedId)) {
+      if (jobs.length > 0) setSelectedId(jobs[0].id);
+    }
+
+    const readyJob = jobs.find((j) => j.status === 'ready' && !autoProcessingIdsRef.current.has(j.id));
+    if (readyJob) {
+      autoProcessingIdsRef.current.add(readyJob.id);
+      setSelectedId(readyJob.id);
+      setActiveTab('cutout');
+      setBgModelKey('chopper');
+      processJob(readyJob, 'chopper');
+    }
+  }, [jobs, bgModelKey, selectedId]);
 
   function removeJob(id: string) {
+    autoProcessingIdsRef.current.delete(id);
     setJobs((items) => {
       const found = items.find((item) => item.id === id);
       if (found) {
@@ -895,10 +1047,13 @@ export default function BGRemoveWorkspace({
       status: 'ready',
       progress: 0,
       message: 'Queued for cutout processing',
+      model: 'chopper',
     };
+    setBgModelKey('chopper');
     setJobs((prev) => [...prev, newJob]);
     setSelectedId(newJob.id);
     addToast('success', `Image "${file.name}" ready for cutout.`);
+    setActiveTab('cutout');
   };
 
   const filteredElements = ELEMENT_PRESETS.filter((p) => {
@@ -906,6 +1061,134 @@ export default function BGRemoveWorkspace({
     return p.category === elementCategory;
   });
 
+  /* ----------------------------------------------------------
+     CUTOUT RUN STATE: Diablo high-precision option & processing status
+     ---------------------------------------------------------- */
+  const isServiceBusy = selected?.status === 'loading' || selected?.status === 'processing';
+  const hasCutout = selected?.status === 'done' && !!selected.resultUrl;
+
+  useEffect(() => {
+    if (isServiceBusy) {
+      setDownloadMenuOpen(false);
+      setMobileDownloadOpen(false);
+    }
+  }, [isServiceBusy]);
+
+  const diabloOptionControl = hasCutout ? (
+    <div className="flex flex-col gap-2">
+      {bgModelKey === 'diablo' ? (
+        /* State 3: Diablo is active */
+        <div className="rounded-2xl border border-amber-400/35 bg-amber-400/[0.08] p-3.5 shadow-sm flex flex-col gap-2.5 transition-all">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-400/20 text-amber-300 border border-amber-400/30 shrink-0">
+                <Focus className="h-4 w-4" />
+              </div>
+              <div>
+                <span className="text-xs font-black text-amber-300 tracking-wide block">Diablo Model Active</span>
+                <span className="text-[10px] text-amber-200/60 block">Studio-grade edge matting</span>
+              </div>
+            </div>
+            <span className="shrink-0 flex items-center gap-1 rounded-full bg-amber-400/20 border border-amber-400/40 px-2 py-0.5 text-[9.5px] font-bold text-amber-300">
+              Active
+            </span>
+          </div>
+
+          <p className="text-[11px] text-amber-100/70 leading-relaxed">
+            High-precision neural matting is active, capturing intricate hair, fur, and complex transparent edge details.
+          </p>
+
+          <button
+            type="button"
+            onClick={() => handleModelSwitch('chopper')}
+            disabled={isServiceBusy || isDownloading}
+            className="w-full py-2 px-3 rounded-xl border border-slate-200 dark:border-white/15 bg-white/10 hover:bg-white/15 text-slate-900 dark:text-white font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Zap className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+            <span>Switch back to Chopper (Fast)</span>
+          </button>
+        </div>
+      ) : (
+        /* State 2: Chopper succeeded — offer Diablo */
+        <div className="rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.03] p-3.5 shadow-sm flex flex-col gap-2.5 transition-all">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-white">
+                <span>Need cleaner hair or complex edges?</span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-white/50 mt-0.5 leading-relaxed">
+                Try Diablo model for studio-grade edge matting on complex portraits, fur & translucent edges.
+              </p>
+            </div>
+            {isDiabloCached && (
+              <span className="shrink-0 flex items-center gap-1 rounded-full bg-[#00FF85]/15 border border-[#00FF85]/30 px-2 py-0.5 text-[9.5px] font-bold text-[#00FF85]">
+                <Check className="h-3 w-3" />
+                <span>Downloaded & ready offline</span>
+              </span>
+            )}
+          </div>
+
+          {isDiabloCached ? (
+            /* Diablo is already cached — instant switch without download warnings or delays */
+            <button
+              type="button"
+              onClick={() => handleModelSwitch('diablo')}
+              disabled={isServiceBusy || isDownloading}
+              className="w-full py-2.5 px-3 rounded-xl border border-amber-400/40 bg-amber-400/10 hover:bg-amber-400/20 text-amber-300 font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Focus className="h-4 w-4 text-amber-300 shrink-0" />
+              <span>Switch to Diablo Model</span>
+            </button>
+          ) : showDiabloConfirm ? (
+            /* Diablo not cached & user clicked Try Diablo — explicit confirmation card */
+            <div className="rounded-xl border border-amber-400/30 bg-amber-400/[0.07] p-3 flex flex-col gap-2.5 animate-in fade-in duration-150">
+              <div className="flex items-center gap-2 text-amber-300 text-xs font-bold">
+                <div className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-400/20 text-amber-300 border border-amber-400/30 shrink-0">
+                  <Focus className="h-3 w-3" />
+                </div>
+                <span>High-Precision Studio Model</span>
+              </div>
+              <p className="text-[11px] text-amber-100/80 leading-relaxed">
+                Diablo is a high-precision model requiring a one-time download (~220 MB) that will be cached offline in your browser. Processing takes slightly longer but delivers maximum edge fidelity for hair and complex outlines.
+              </p>
+              <div className="flex items-center gap-2 pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDiabloConfirm(false);
+                    handleModelSwitch('diablo');
+                  }}
+                  disabled={isServiceBusy || isDownloading}
+                  className="flex-1 py-2 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-extrabold text-xs transition flex items-center justify-center gap-1.5 shadow-md shadow-amber-400/20 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Focus className="h-3.5 w-3.5 shrink-0" />
+                  <span>Download & Try Diablo</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDiabloConfirm(false)}
+                  className="py-2 px-3 rounded-xl border border-slate-300 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-white/70 font-bold text-xs transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Diablo not cached & confirmation closed — offer Try Diablo */
+            <button
+              type="button"
+              onClick={() => setShowDiabloConfirm(true)}
+              disabled={isServiceBusy || isDownloading}
+              className="w-full py-2.5 px-3 rounded-xl border border-amber-400/40 bg-amber-400/10 hover:bg-amber-400/20 text-amber-300 font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Focus className="h-4 w-4 text-amber-300 shrink-0" />
+              <span>Try Diablo model</span>
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  ) : null;
   if (jobs.length === 0) {
     return (
       <UploadArea
@@ -1016,17 +1299,20 @@ export default function BGRemoveWorkspace({
           <div className="relative" ref={downloadMenuRef}>
             <button
               type="button"
-              disabled={!selected?.resultUrl || selected?.status === 'loading' || selected?.status === 'processing' || isDownloading}
-              onClick={() => setDownloadMenuOpen((prev) => !prev)}
+              disabled={!selected?.resultUrl || isDownloading || isServiceBusy}
+              onClick={() => {
+                if (!selected?.resultUrl || isDownloading || isServiceBusy) return;
+                setDownloadMenuOpen((prev) => !prev);
+              }}
               aria-expanded={downloadMenuOpen}
-              className="px-4 sm:px-5 py-2 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white font-extrabold text-xs shadow-lg shadow-blue-600/30 transition flex items-center gap-1.5 cursor-pointer"
+              className="px-4 sm:px-5 py-2 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-extrabold text-xs shadow-lg shadow-blue-600/30 transition flex items-center gap-1.5 cursor-pointer"
             >
               <DownloadIcon className="h-3.5 w-3.5" />
               <span>{isDownloading ? 'Rendering' : 'Download'}</span>
               <ChevronDown className="h-3.5 w-3.5" />
             </button>
 
-            {downloadMenuOpen && (
+            {downloadMenuOpen && !isServiceBusy && (
               <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-white dark:bg-[#1A1A24] border border-slate-200 dark:border-white/10 shadow-2xl p-2 z-50 flex flex-col gap-1 text-xs font-semibold">
                 <button
                   type="button"
@@ -1149,7 +1435,12 @@ export default function BGRemoveWorkspace({
               </span>
               {selected?.status === 'done' && (
                 <span className="text-[11px] font-mono px-2.5 py-1 rounded-full bg-[#00FF85]/15 text-[#00FF85] border border-[#00FF85]/30 font-bold">
-                  ✓ Clean Cutout
+                  ✓ Clean Cutout{selected.model ? ` · ${BG_MODELS[selected.model].label}` : ''}
+                </span>
+              )}
+              {selected?.status === 'ready' && (
+                <span className="text-[11px] font-mono px-2.5 py-1 rounded-full bg-[#00FF85]/15 text-[#00FF85] border border-[#00FF85]/30 font-bold">
+                  ◆ Removing background…
                 </span>
               )}
             </div>
@@ -1335,6 +1626,9 @@ export default function BGRemoveWorkspace({
                     exit={{ opacity: 0, y: -6 }}
                     className="flex flex-col gap-4 text-xs font-semibold"
                   >
+                    {/* DIABLO OPTION & STATUS */}
+                    {diabloOptionControl}
+                      
                     <div>
                       <span className="text-slate-800 dark:text-white font-bold block mb-1.5">
                         Cutout Tools
@@ -1413,15 +1707,16 @@ export default function BGRemoveWorkspace({
                       <div className="relative group inline-block">
                         <button
                           type="button"
-                          onClick={() => { if (selected) processJob(selected); }}
-                          className="px-4 py-2 rounded-xl text-rose-500 hover:bg-rose-500/10 border border-rose-400/30 text-xs font-bold transition flex items-center gap-1.5"
+                          disabled={isServiceBusy || isDownloading}
+                          onClick={() => { if (selected && !isServiceBusy && !isDownloading) processJob(selected); }}
+                          className="px-4 py-2 rounded-xl text-rose-500 hover:bg-rose-500/10 border border-rose-400/30 text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
                         >
                           <span>↺</span> Re-run AI Cutout
                         </button>
 
                         {/* Custom Tooltip */}
                         <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-slate-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap shadow-md pointer-events-none">
-                          Click to process the AI cutout again
+                          {isServiceBusy || isDownloading ? 'Processing in progress...' : 'Click to process the AI cutout again'}
                         </span>
                       </div>
 
@@ -2653,18 +2948,23 @@ export default function BGRemoveWorkspace({
         <div className="relative shrink-0 pr-2 border-r border-white/10" ref={mobileDownloadMenuRef}>
           <button
             type="button"
-            disabled={!selected?.resultUrl || selected?.status === 'loading' || selected?.status === 'processing' || isDownloading}
-            onClick={() => setMobileDownloadOpen((prev) => !prev)}
-            className="flex flex-col items-center justify-center gap-1 group cursor-pointer disabled:opacity-40"
+            disabled={!selected?.resultUrl || isDownloading || isServiceBusy}
+            onClick={() => {
+              if (!selected?.resultUrl || isDownloading || isServiceBusy) return;
+              setMobileDownloadOpen((prev) => !prev);
+            }}
+            className="flex flex-col items-center justify-center gap-1 group cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <div className="h-10 w-10 rounded-full bg-blue-600 group-hover:bg-blue-500 text-white flex items-center justify-center shadow-lg shadow-blue-600/40 transition active:scale-95">
+            <div className="h-10 w-10 rounded-full bg-blue-600 group-hover:bg-blue-500 text-white flex items-center justify-center shadow-lg shadow-blue-600/40 transition active:scale-95 group-disabled:hover:bg-blue-600">
               <DownloadIcon className="h-4 w-4" />
             </div>
-            <span className="text-[10px] font-bold text-neutral-200 group-hover:text-white">Download</span>
+            <span className="text-[10px] font-bold text-neutral-200 group-hover:text-white">
+              {isDownloading ? 'Rendering' : 'Download'}
+            </span>
           </button>
 
           {/* MOBILE DOWNLOAD POPUP — FIXED HIGH Z-INDEX TO NEVER BE CLIPPED */}
-          {mobileDownloadOpen && (
+          {mobileDownloadOpen && !isServiceBusy && (
             <>
               {/* Tap outside backdrop */}
               <div

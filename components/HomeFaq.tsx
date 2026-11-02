@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+'use client';
+
+import React, { useEffect, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 
 interface FaqItem {
@@ -9,47 +11,62 @@ interface FaqItem {
 const FAQ_ITEMS: FaqItem[] = [
   {
     q: 'How does Pixelify process images without uploading to cloud servers?',
-    a: 'Pixelify executes AI neural networks (Chopper for background removal, Vitality, Pixel-Dance & Alpha-Satoru for upscaling) directly in your browser using ONNX Runtime Web and WebGPU. Model weights are downloaded to your browser cache on first use, after which all tensor math runs locally on your device with 0 bytes uploaded to external servers.',
+    a: 'The AI runs right in your browser using WebGPU and ONNX Runtime, so your images stay on your device—not on someone else’s server.',
   },
   {
     q: 'Is Pixelify really 100% free with no watermarks or subscriptions?',
-    a: 'Yes, completely free. Because all computation runs locally on your machine, we do not pay expensive cloud GPU compute bills per image. This allows us to offer unlimited high-resolution exports (PNG, WebP, JPEG) without paywalls, subscriptions, credits, or watermarks.',
+    a: 'Yes—no subscriptions, credits, watermarks, or surprise paywalls; just upload, edit, and download.',
   },
   {
     q: 'What is the maximum resolution and image size I can upscale?',
-    a: 'You can upscale inputs up to 40 MB and export dimensions up to 16,384 × 16,384 pixels (16K Ultra HD), limited only by your computer’s available GPU memory. Standard 2×, 4×, and 8× scale multipliers are supported.',
+    a: 'Upscale images up to 40 MB and 16K resolution (16,384 × 16,384 px)—your device’s memory is the only real boss here.',
   },
   {
     q: 'Can I use Pixelify offline without an active internet connection?',
-    a: 'Yes! Once a neural model has been loaded once, its weights remain cached securely in your browser storage. You can open Pixelify and remove backgrounds or upscale photos on flights, train commutes, or remote locations without any Wi-Fi or cellular connection.',
+    a: 'Once the AI models are cached, you can process images offline—perfect for flights, commutes, or Wi-Fi that decided to take a day off.',
   },
   {
     q: 'How does Chopper compare to standard background removers?',
-    a: 'Most online tools use basic color-keying or low-resolution segmentation that destroys fine hair, fur, and glass transparency. Chopper performs sub-pixel edge matting, preserving microscopic hair strands, translucent veils, and complex contours with studio-grade precision.',
+    a: 'Chopper is designed to preserve tricky details like hair, fur, and fine edges, so your subject doesn’t end up looking like it lost a fight with scissors.',
   },
   {
     q: 'Does Pixelify work on mobile phones and tablets?',
-    a: 'Yes. Pixelify is fully responsive and supports mobile Safari and Chrome on iOS and Android. If your mobile device does not support WebGPU, it automatically switches to multi-threaded WebAssembly (WASM SIMD) so processing still works reliably.',
+    a: 'Yes! Pixelify works on supported mobile browsers too, using WebGPU or a compatible WASM fallback when available.',
   },
   {
     q: 'Are my private photos and client confidential assets safe?',
-    a: 'Your image data stays on your device. You can inspect your browser’s Developer Tools Network tab during processing: no image payloads or editing activity are sent to a server. A separate aggregate site-visit counter, described in our privacy policy, never receives image data.',
+    a: 'Your images stay on your device during processing; even our site-visit counter has no business knowing what you’re editing.',
   },
   {
     q: 'How do I clear downloaded models if I need to free up browser storage?',
-    a: 'You can clear cached models at any time by opening the Settings dropdown in the navigation bar (or in the mobile sidebar on phones) and clicking "Clear downloaded models".',
+    a: 'Open Settings and select “Clear downloaded models”—a quick cleanup without having to clear your entire browser cache.',
   },
 ];
 
 export default function HomeFaq() {
+  const rootRef = useRef<HTMLElement>(null);
   const [openIdx, setOpenIdx] = useState<number | null>(0);
 
-  const toggle = (idx: number) => {
-    setOpenIdx(openIdx === idx ? null : idx);
-  };
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            root.classList.add('pb-in');
+            io.disconnect();
+          }
+        });
+      },
+      { threshold: 0.08 }
+    );
+    io.observe(root);
+    return () => io.disconnect();
+  }, []);
 
   return (
-    <section id="home-faq" className="w-full bg-transparent text-white py-12 sm:py-16 lg:py-20 relative z-20 my-4 sm:my-8">
+    <section className="uc-faq uc-faq--home" id="home-faq" ref={rootRef}>
       {/* FAQPage structured data for search engines */}
       <script
         type="application/ld+json"
@@ -67,72 +84,42 @@ export default function HomeFaq() {
         }}
       />
 
-      {/* Decorative ambient subtle radial glow on dark background */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[350px] bg-[#00FF85]/5 rounded-full blur-[140px] pointer-events-none" />
+      <div className="uc-glow uc-glow-a" aria-hidden="true" />
 
-      <div className="w-full relative z-10 flex flex-col gap-10 sm:gap-14">
-        {/* ========================================================================= */}
-        {/* HEADER                                                                    */}
-        {/* ========================================================================= */}
-        <header className="flex flex-col items-center text-center gap-3 px-2">
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-[1.08]">
-            <span className="text-[#00FF85]">F</span>requently{' '}
-            <span className="text-[#00FF85]">A</span>sked{' '}
-            <span className="text-[#00FF85]">Q</span>uestions
+      <div className="uc-faq-inner">
+        {/* ---------- TOP: centered header ---------- */}
+        <header className="uc-faq-head">
+          <h2 className="uc-faq-title pb-reveal" style={{ '--rv-i': 1 } as React.CSSProperties}>
+            <span className="text-[#00ff85]">F</span>requently{' '}
+            <span className="text-[#00ff85]">A</span>sked{' '}
+            <span className="text-[#00ff85]">Q</span>uestions
           </h2>
         </header>
 
-        {/* ========================================================================= */}
-        {/* ACCORDION LIST: TRANSPARENT DARK THEME ON TOP OF BODY COLOR               */}
-        {/* ========================================================================= */}
-        <div className="flex flex-col border-t border-white/10">
+        {/* ---------- ACCORDION LIST ---------- */}
+        <div className="uc-faq-list">
           {FAQ_ITEMS.map((item, idx) => {
             const isOpen = openIdx === idx;
             return (
               <article
                 key={idx}
-                className="border-b border-white/10 transition-colors duration-200"
+                className={`uc-faq-item pb-reveal ${isOpen ? 'is-open' : ''}`}
+                style={{ '--rv-i': idx + 2 } as React.CSSProperties}
               >
                 <button
                   type="button"
-                  onClick={() => toggle(idx)}
+                  className="uc-faq-q"
                   aria-expanded={isOpen}
-                  className="group flex items-center justify-between gap-4 w-full py-5 sm:py-6 text-left cursor-pointer transition-colors duration-200 select-none"
+                  onClick={() => setOpenIdx(isOpen ? null : idx)}
                 >
-                  <div className="flex min-w-0">
-                    <span
-                      className={`text-base sm:text-lg lg:text-xl font-bold tracking-tight transition-colors duration-200 ${
-                        isOpen ? 'text-[#00FF85]' : 'text-white group-hover:text-[#00FF85]'
-                      }`}
-                    >
-                      {item.q}
-                    </span>
-                  </div>
-
-                  {/* Plus Icon that rotates 135deg on expand */}
-                  <span
-                    aria-hidden="true"
-                    className={`shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-full border flex items-center justify-center transition-all duration-300 ${
-                      isOpen
-                        ? 'rotate-[135deg] bg-[#00FF85] border-[#00FF85] text-neutral-950 shadow-lg shadow-[#00FF85]/20'
-                        : 'bg-white/5 border-white/10 text-neutral-300 group-hover:border-[#00FF85] group-hover:bg-[#00FF85]/10 group-hover:text-[#00FF85]'
-                    }`}
-                  >
-                    <Plus size={18} strokeWidth={2.4} />
+                  <span className="uc-faq-qtext">{item.q}</span>
+                  <span className="uc-faq-plus" aria-hidden="true">
+                    <Plus size={16} strokeWidth={2.4} />
                   </span>
                 </button>
-
-                {/* Animated Answer Body via Grid Rows */}
-                <div
-                  className="grid transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden"
-                  style={{
-                    gridTemplateRows: isOpen ? '1fr' : '0fr',
-                  }}
-                >
-                  <div className="overflow-hidden">
-                    <p className="pb-6 pr-4 text-xs leading-relaxed text-neutral-400 sm:pr-8 sm:text-sm md:text-base">
-                      {item.a}
-                    </p>
+                <div className="uc-faq-a" role="region">
+                  <div className="uc-faq-a-inner">
+                    <p>{item.a}</p>
                   </div>
                 </div>
               </article>

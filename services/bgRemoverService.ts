@@ -8,6 +8,8 @@
  * 3. The background-removal model is cached and ready before the user uploads an image.
  * 4. All components (App, Navbar, BGRemoveWorkspace) share the single worker instance.
  */
+import { BgModelKey } from '../types';
+import { CHOPPER_MODEL_URL, DIABLO_MODEL_URL } from '../lib/constants';
 
 export type BGEngine = 'wasm' | 'webgpu';
 
@@ -20,6 +22,7 @@ export interface BGRemoverState {
   phase: 'idle' | 'detecting' | 'downloading' | 'preparing' | 'ready' | 'error';
   error: string | null;
   fallbackReason: string | null;
+  model: BgModelKey;
 }
 
 export type EngineSubscriber = (engine: BGEngine, webgpuAvailable: boolean) => void;
@@ -28,6 +31,7 @@ export type StageSubscriber = (stage: string, message?: string) => void;
 
 interface JobResolver {
   url: string;
+  model: BgModelKey;
   resolve: (res: { blob: Blob; elapsedMs: number }) => void;
   reject: (err: Error) => void;
   onProgress?: ProgressSubscriber;
@@ -48,6 +52,7 @@ class BGRemoverService {
     phase: 'idle',
     error: null,
     fallbackReason: null,
+    model: 'chopper',
   };
   private initPromise: Promise<void> | null = null;
   private resolveInit: (() => void) | null = null;
@@ -100,10 +105,25 @@ class BGRemoverService {
         if (msg.type === 'PROGRESS') {
           this.state.progress = msg.progress;
           this.state.phase = 'downloading';
+
+          if (msg.model === 'diablo' || msg.model === 'chopper') this.state.model = msg.model;
+          else if (msg.isWeights && this.state.model !== 'diablo') this.state.model = 'chopper';
+
           this.notifyStateSubscribers();
           this.jobResolvers.forEach((resolver) => {
             resolver.onProgress?.(msg.progress, msg.isWeights, msg.file);
           });
+          return;
+        }
+
+        if (msg.type === 'STATUS') {
+          if (msg.engine && (msg.engine === 'webgpu' || msg.engine === 'wasm')) {
+            if (this.state.engine !== msg.engine) {
+              this.state.engine = msg.engine;
+              this.notifyEngineSubscribers();
+              this.notifyStateSubscribers();
+            }
+          }
           return;
         }
 
@@ -133,7 +153,13 @@ class BGRemoverService {
           if (this.replayJobsOnReady) {
             this.replayJobsOnReady = false;
             this.jobResolvers.forEach((resolver, id) => {
-              this.worker?.postMessage({ type: 'REMOVE_BG', id, url: resolver.url });
+              this.worker?.postMessage({
+                type: 'REMOVE_BG',
+                id,
+                url: resolver.url,
+                model: resolver.model,
+                diabloModelUrl: DIABLO_MODEL_URL,
+              });
             });
           }
           return;
@@ -157,6 +183,9 @@ class BGRemoverService {
           this.state.progress = 100;
           this.state.phase = 'ready';
           this.state.error = null;
+
+          if (msg.model === 'diablo' || msg.model === 'chopper') this.state.model = msg.model;
+
           if (msg.reason) {
             this.state.fallbackReason = msg.reason;
           } else if (this.state.webgpuAvailable && this.state.engine === 'wasm') {
@@ -169,16 +198,28 @@ class BGRemoverService {
         }
 
         if (msg.type === 'DONE') {
+          console.log(`[Pixelify BG Service] 📥 Worker DONE for job: ${msg.id}, model: ${msg.model || 'chopper'}, blob size: ${msg.blob?.size} bytes, elapsed: ${msg.elapsedMs}ms`);
+          if (msg.model === 'diablo') {
+            console.log(`[Diablo Model] 📥 BGRemoverService: Received DONE output from worker for job "${msg.id}" (Cutout PNG size: ${(msg.blob?.size / 1024).toFixed(1)} KB, elapsed: ${msg.elapsedMs}ms)`);
+          }
+          if (msg.engine && (msg.engine === 'webgpu' || msg.engine === 'wasm')) {
+            this.state.engine = msg.engine;
+            this.notifyEngineSubscribers();
+            this.notifyStateSubscribers();
+          }
           const entry = this.jobResolvers.get(msg.id);
           if (entry) {
             this.jobResolvers.delete(msg.id);
             entry.resolve({ blob: msg.blob, elapsedMs: msg.elapsedMs });
+          } else {
+            console.warn(`[Pixelify BG Service] ⚠️ No resolver found for job: ${msg.id}`);
           }
           return;
         }
 
         if (msg.type === 'ERROR') {
           const errMsg = msg.message || 'Cutout failed';
+          console.error(`[Pixelify BG Service] ❌ Worker ERROR for job: ${msg.id}:`, errMsg);
           if (msg.engineFailed && !this.forceWasm) {
             this.restartWithWasm(errMsg);
             return;
@@ -223,7 +264,12 @@ class BGRemoverService {
         try {
           const worker = this.getWorker();
           this.startCapabilityWatchdog(worker);
-          worker.postMessage({ type: 'INIT', forceWasm: this.forceWasm });
+          worker.postMessage({
+            type: 'INIT',
+            forceWasm: this.forceWasm,
+            modelUrl: CHOPPER_MODEL_URL,
+            diabloModelUrl: DIABLO_MODEL_URL,
+          });
         } catch (err) {
           console.warn('[BGRemoverService] init postMessage failed:', err);
           this.state.isLoading = false;
@@ -277,6 +323,7 @@ class BGRemoverService {
       phase: 'idle',
       error: null,
       fallbackReason: null,
+      model: 'chopper',
     };
     this.notifyStateSubscribers();
   }
@@ -296,16 +343,68 @@ class BGRemoverService {
     this.stateSubscribers.forEach((cb) => cb(this.state));
   }
 
+  public switchModel(targetModel: BgModelKey): void {
+    console.log(`[BGRemoverService] 🔄 Switching active model to "${targetModel}". Terminating old worker to reclaim 100% RAM...`);
+    this.clearCapabilityWatchdog();
+    this.worker?.terminate();
+    this.worker = null;
+    this.initPromise = null;
+    this.resolveInit = null;
+    this.forceWasm = false;
+    this.replayJobsOnReady = false;
+
+    this.state.model = targetModel;
+    this.state.engine = null;
+    this.state.fallbackReason = null;
+    this.state.isReady = false;
+    this.state.isLoading = false;
+    this.state.phase = 'idle';
+    this.state.progress = 0;
+    this.state.error = null;
+    this.notifyStateSubscribers();
+  }
+
+  public unloadModel(model: BgModelKey | 'all'): void {
+    console.log(`[Pixelify BG Service] 🧹 Unloading model "${model}": terminating worker to release 100% RAM`);
+    this.clearCapabilityWatchdog();
+    this.worker?.terminate();
+    this.worker = null;
+    this.initPromise = null;
+    this.resolveInit = null;
+    this.forceWasm = false;
+    this.replayJobsOnReady = false;
+
+    this.state.isReady = false;
+    this.state.isLoading = false;
+    this.state.phase = 'idle';
+    this.state.progress = 0;
+    this.state.error = null;
+    this.state.fallbackReason = null;
+    this.state.engine = null;
+    this.notifyStateSubscribers();
+  }
+
   public removeBackground(
     id: string,
     url: string,
     onProgress?: ProgressSubscriber,
-    onStage?: StageSubscriber
+    onStage?: StageSubscriber,
+    model: BgModelKey = "chopper"
   ): Promise<{ blob: Blob; elapsedMs: number }> {
+    console.log(`[Pixelify BG Service] 📤 Requesting removeBackground for job: ${id}, model: ${model}, url: ${url?.slice(0, 50)}...`);
+    if (model === 'diablo') {
+      console.log(`[Diablo Model] 📤 BGRemoverService: Dispatched removeBackground with model="diablo" to worker (Job ID: "${id}")`);
+    }
     const worker = this.getWorker();
     return new Promise((resolve, reject) => {
-      this.jobResolvers.set(id, { url, resolve, reject, onProgress, onStage });
-      worker.postMessage({ type: 'REMOVE_BG', id, url });
+      this.jobResolvers.set(id, { url, resolve, reject, onProgress, onStage, model });
+      worker.postMessage({
+        type: 'REMOVE_BG',
+        id,
+        url,
+        model,
+        diabloModelUrl: DIABLO_MODEL_URL,
+      });
     });
   }
 
@@ -364,7 +463,12 @@ class BGRemoverService {
     try {
       const worker = this.getWorker();
       this.startCapabilityWatchdog(worker);
-      worker.postMessage({ type: 'INIT', forceWasm: true });
+      worker.postMessage({
+        type: 'INIT',
+        forceWasm: true,
+        modelUrl: CHOPPER_MODEL_URL,
+        diabloModelUrl: DIABLO_MODEL_URL,
+      });
     } catch (err) {
       this.state.isLoading = false;
       this.state.phase = 'error';

@@ -1,4 +1,4 @@
-import type { EnhancementOptions, ModelConfig, ModelKey, BackgroundPrompt } from '../types';
+import type { EnhancementOptions, ModelConfig, ModelKey, BackgroundPrompt, BgModelKey } from '../types';
 
 /* ==========================================================================
    REAL PRESET CONFIGURATIONS
@@ -175,19 +175,25 @@ export function getDefaultPreset(modelKey: ModelKey): string {
   return modelKey === 'vitality' ? 'Standard' : 'Balanced';
 }
 
-/** ONNX models are fetched from raw.githubusercontent.com — it serves
- *  Access-Control-Allow-Origin: * (GitHub release download URLs do NOT, they
- *  302 to release-assets.githubusercontent.com which omits CORS headers and
- *  breaks fetch()). Same-origin /models/* copies in public/ remain as an
- *  automatic fallback, so this also keeps ~130MB of model traffic off the
- *  Vercel bandwidth quota while staying resilient to GitHub rate limits. */
-const MODEL_BASE_URL =
-  'https://raw.githubusercontent.com/yash5800/pixelify/main/public/models/';
+/** Upscaler models default to local same-origin /models/ copies with support
+ *  for optional CDN / Hugging Face remote overrides via env. */
+const RAW_MODEL_BASE_URL = process.env.NEXT_PUBLIC_MODEL_BASE_URL || '/models/';
+const MODEL_BASE_URL = RAW_MODEL_BASE_URL.endsWith('/') ? RAW_MODEL_BASE_URL : `${RAW_MODEL_BASE_URL}/`;
+
+/** Resolves model URL with fallback and automatically converts HF /blob/ to /resolve/ */
+function resolveModelUrl(envUrl: string | undefined, defaultFilename: string): string {
+  const url = envUrl?.trim() || `${MODEL_BASE_URL}${defaultFilename}`;
+  // Hugging Face /blob/ serves an HTML preview page; /resolve/ serves the raw binary
+  return url.replace('/blob/', '/resolve/');
+}
 
 export const MODELS: Record<ModelKey, ModelConfig> = {
   vitality: {
     name: 'Vitality (Fast / Clean)',
-    file: `${MODEL_BASE_URL}Vitality.onnx`,
+    file: resolveModelUrl(
+      process.env.NEXT_PUBLIC_HF_VITALITY_MODEL || process.env.NEXT_PUBLIC_HG_VITALITY_MODEL,
+      'Vitality.tflite'
+    ),
     tileSize: 128,
     scale: 4,
     color: 'rgb',
@@ -211,7 +217,10 @@ export const MODELS: Record<ModelKey, ModelConfig> = {
   },
   'pixel-dance': {
     name: 'Pixel-Dance (Extreme Clarity & 8K)',
-    file: `${MODEL_BASE_URL}Pixel-Dance.onnx`,
+    file: resolveModelUrl(
+      process.env.NEXT_PUBLIC_HF_PIXEL_DANCE_MODEL || process.env.NEXT_PUBLIC_HG_PIXEL_DANCE_MODEL,
+      'Pixel-Dance.tflite'
+    ),
     tileSize: 128,
     scale: 4,
     color: 'rgb',
@@ -235,7 +244,10 @@ export const MODELS: Record<ModelKey, ModelConfig> = {
   },
   'alpha-satoru': {
     name: 'Alpha-Satoru (Studio / 4× / 8×)',
-    file: `${MODEL_BASE_URL}Alpha-Satoru.onnx`,
+    file: resolveModelUrl(
+      process.env.NEXT_PUBLIC_HF_ALPHA_SATORU_MODEL || process.env.NEXT_PUBLIC_HG_ALPHA_SATORU_MODEL,
+      'Alpha-Satoru.tflite'
+    ),
     tileSize: 128,
     scale: 4,
     color: 'rgb',
@@ -259,14 +271,81 @@ export const MODELS: Record<ModelKey, ModelConfig> = {
   },
 };
 
+/** Optional remote URL for background removal model (Chopper) configured via env. */
+export const CHOPPER_MODEL_URL =
+  process.env.NEXT_PUBLIC_HF_CHOPPER_MODEL || process.env.NEXT_PUBLIC_HG_CHOPPER_MODEL
+    ? resolveModelUrl(
+      process.env.NEXT_PUBLIC_HF_CHOPPER_MODEL || process.env.NEXT_PUBLIC_HG_CHOPPER_MODEL,
+      'chopper.onnx'
+    )
+    : undefined;
+
+/** Optional remote URL for background removal model (Diablo) configured via env. Falls back to /models/Diablo.onnx */
+export const DIABLO_MODEL_URL = resolveModelUrl(
+  process.env.NEXT_PUBLIC_HF_DIABLO_MODEL || process.env.NEXT_PUBLIC_HG_DIABLO_MODEL,
+  'Diablo.onnx'
+);
+
 export const MAX_OUTPUT_DIM = 16384;
 
-export function detectBackend(): 'webgpu' | 'wasm' {
-  const isSecure =
-    location.hostname === 'localhost' || location.protocol === 'https:';
-  if (isSecure && 'gpu' in navigator && navigator.gpu) return 'webgpu';
-  return 'wasm';
+/* ============================================================
+   BACKGROUND REMOVER MODELS (Cutout Models)
+   chopper   — BiRefNet-lite 512 (transformers.js, ~44MB, fast)
+   diablo    — BEN2-family 1024 matting network (raw ONNX,
+               ~222MB first download, ultra-precision edges)
+   ============================================================ */
+export interface BgModelConfig {
+  name: string;
+  label: string;
+  desc: string;
+  size: string;
+  file?: string;
+  badges: {
+    quality: string;
+    time: string;
+    req: string;
+  };
+  popular?: boolean;
+  premium?: boolean;
 }
+
+export const BG_MODELS: Record<BgModelKey, BgModelConfig> = {
+  chopper: {
+    name: 'Chopper (Fast / Clean)',
+    label: 'Chopper',
+    desc: 'Fast neural cutouts with hair-safe edges.',
+    size: '~190MB',
+    file: CHOPPER_MODEL_URL,
+    badges: {
+      quality: 'Fast & Precise',
+      time: '~1-2s',
+      req: 'WebGPU / SIMD',
+    },
+    popular: true,
+  },
+  diablo: {
+    name: 'Diablo (Ultra Precision / BEN2)',
+    label: 'Diablo',
+    desc: 'Max edge fidelity for hair, fur & glass.',
+    size: '~200MB',
+    file: DIABLO_MODEL_URL,
+    badges: {
+      quality: 'Studio Matting',
+      time: '~5-15s',
+      req: 'WebGPU Preferred',
+    },
+    premium: true,
+  },
+};
+
+export const DEFAULT_BG_MODEL: BgModelKey = 'chopper';
+
+// export function detectBackend(): 'webgpu' | 'wasm' {
+//   const isSecure =
+//     location.hostname === 'localhost' || location.protocol === 'https:';
+//   if (isSecure && 'gpu' in navigator && navigator.gpu) return 'webgpu';
+//   return 'wasm';
+// }
 
 export const BACKGROUND_PROMPTS: BackgroundPrompt[] = [
   {
@@ -342,7 +421,7 @@ export const FEATURES = [
 export const FAQS = [
   {
     q: 'How does client-side AI image upscaling work?',
-    a: 'We leverage ONNX Runtime Web with WebGPU / WebAssembly acceleration. Neural network models run directly in your web browser, using your GPU to process pixel tensors without sending images to any remote server.'
+    a: 'We leverage Google LiteRT with WebGPU / WebAssembly acceleration. Neural network models run directly in your web browser, using your GPU to process pixel tensors without sending images to any remote server.'
   },
   {
     q: 'Does it cost money or require credits?',

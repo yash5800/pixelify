@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Crop as CropIcon } from 'lucide-react';
+import ModelLoader from './upscaler/ModelLoader';
 import FabricImageEditor, {
   FabricEditMode,
   FabricCropRatio,
@@ -137,6 +138,8 @@ export default function BGComparator({
   const [subjectPos, setSubjectPos] = useState({ x: 0, y: 0 });
   const [resultAspectRatio, setResultAspectRatio] = useState<number | null>(null);
 
+  const isProcessing = job.status === 'loading' || job.status === 'processing';
+
   // Viewport Zoom & Pan state (applies to artboard across all modes)
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -219,7 +222,17 @@ export default function BGComparator({
     setPan({ x: 0, y: 0 });
   }, [job?.id]);
 
+  // Keep artboard centered and kill dragging while processing AI cutout
+  useEffect(() => {
+    if (isProcessing) {
+      setPan({ x: 0, y: 0 });
+      setIsPanning(false);
+      isPanningRef.current = false;
+    }
+  }, [isProcessing]);
+
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (isProcessing) return;
     const isMiddleClick = e.button === 1;
     const isLeftClick = e.button === 0;
 
@@ -248,6 +261,7 @@ export default function BGComparator({
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (isProcessing) return;
     if (!isPanningRef.current) return;
     hasPannedRef.current = true;
     setPan({
@@ -257,6 +271,13 @@ export default function BGComparator({
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (isProcessing) {
+      if (isPanningRef.current) {
+        isPanningRef.current = false;
+        setIsPanning(false);
+      }
+      return;
+    }
     if (isPanningRef.current) {
       isPanningRef.current = false;
       setIsPanning(false);
@@ -269,6 +290,7 @@ export default function BGComparator({
   };
 
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (isProcessing) return;
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
       const delta = e.deltaY < 0 ? 0.25 : -0.25;
@@ -337,6 +359,9 @@ export default function BGComparator({
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        if (job.model === 'diablo') {
+          console.log(`[Diablo Model] 📐 Loaded Diablo cutout natural dimensions: ${img.naturalWidth}x${img.naturalHeight}px (Aspect ratio: ${(img.naturalWidth / img.naturalHeight).toFixed(3)})`);
+        }
         setCutoutDimensions({ width: img.naturalWidth, height: img.naturalHeight });
         setResultAspectRatio(img.naturalWidth / img.naturalHeight);
       }
@@ -376,7 +401,6 @@ export default function BGComparator({
     setSubjectPos({ x: 0, y: 0 });
   }, [job?.id]);
 
-  const isProcessing = job.status === 'loading' || job.status === 'processing';
   const isCutoutActive = activeTab === 'cutout' && !fabricEditMode && !!job.resultUrl && !isProcessing;
   const isBrushMode = isCutoutActive && !isCompareMode && (cutoutTool === 'erase' || cutoutTool === 'restore');
   const isCropMode = fabricEditMode === 'crop';
@@ -403,81 +427,128 @@ export default function BGComparator({
     onHistoryChange?.(undoStack.length > 0, redoStack.length > 0);
   }, [undoStack.length, redoStack.length, onHistoryChange]);
 
+  const activeJobUrlRef = useRef<string | null>(null);
+  const lastPaintedUrlRef = useRef<string | null>(null);
+
+  const drawCutoutImageToCanvas = useCallback((c: HTMLCanvasElement, loadedImg: HTMLImageElement, resultUrl: string) => {
+    const isDiablo = job?.model === 'diablo';
+    if (isDiablo) {
+      console.log(`[Diablo Model] 🖌️ Outputting Diablo cutout image to canvas...`, {
+        naturalSize: `${loadedImg.naturalWidth || loadedImg.width}x${loadedImg.naturalHeight || loadedImg.height}px`,
+        targetCanvas: `${c.width}x${c.height}px`,
+        jobId: job.id,
+      });
+    }
+
+    const maxDim = 2048;
+    const s = Math.min(1, maxDim / Math.max(loadedImg.width, loadedImg.height));
+    c.width = Math.round(loadedImg.width * s);
+    c.height = Math.round(loadedImg.height * s);
+
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.drawImage(loadedImg, 0, 0, c.width, c.height);
+
+    if (isDiablo) {
+      console.log(`[Diablo Model] ✅ Diablo cutout image successfully rendered onto canvas! (Canvas resolution: ${c.width}x${c.height}px)`);
+    }
+
+    lastDrawnCanvasRef.current = c;
+    lastPaintedUrlRef.current = resultUrl;
+
+    // Reset history stacks only when switching to a completely new source image
+    if (resultUrl !== lastInternalStrokeUrlRef.current) {
+      setUndoStack([]);
+      setRedoStack([]);
+    }
+
+    // Load original image to base canvas for restore brush
+    const orig = new Image();
+    if (job.sourceUrl.startsWith('http') && !job.sourceUrl.startsWith('blob:')) {
+      orig.crossOrigin = 'anonymous';
+    }
+    orig.onload = () => {
+      const base = document.createElement('canvas');
+      base.width = c.width;
+      base.height = c.height;
+      const bCtx = base.getContext('2d');
+      if (bCtx) {
+        bCtx.drawImage(orig, 0, 0, base.width, base.height);
+        baseImgCanvasRef.current = base;
+      }
+    };
+    orig.src = job.sourceUrl;
+  }, [job.id, job?.model, job.sourceUrl]);
+
   // Sync cutout image to brush canvas when image loads or changes
   useEffect(() => {
-    const canvas = brushCanvasRef.current;
-    if (!job?.resultUrl || !canvas) return;
-    const resultUrl = job.resultUrl;
-
-    // Only skip redraw if THIS exact canvas element already has the pixels from our own stroke
-    if (lastDrawnCanvasRef.current === canvas && resultUrl === lastInternalStrokeUrlRef.current) {
+    const resultUrl = job?.resultUrl;
+    if (!resultUrl) {
+      lastPaintedUrlRef.current = null;
+      activeJobUrlRef.current = null;
+      lastDrawnCanvasRef.current = null;
+      const c = brushCanvasRef.current;
+      if (c) {
+        const ctx = c.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, c.width, c.height);
+        c.width = 0;
+        c.height = 0;
+      }
+      baseImgCanvasRef.current = null;
+      setUndoStack([]);
+      setRedoStack([]);
       return;
     }
-    let cancelled = false;
 
-    const img = new Image();
-    if (resultUrl.startsWith('http') && !resultUrl.startsWith('blob:')) {
-      img.crossOrigin = 'anonymous';
-    }
+    activeJobUrlRef.current = resultUrl;
 
-    const drawToCanvas = (loadedImg: HTMLImageElement) => {
-      if (cancelled) return;
+    const paint = () => {
+      if (activeJobUrlRef.current !== resultUrl) return;
       const c = brushCanvasRef.current;
-      if (!c) return;
-
-      const maxDim = 2048;
-      const s = Math.min(1, maxDim / Math.max(loadedImg.width, loadedImg.height));
-      c.width = Math.round(loadedImg.width * s);
-      c.height = Math.round(loadedImg.height * s);
-
-      const ctx = c.getContext('2d', { willReadFrequently: true });
-      if (!ctx) return;
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.clearRect(0, 0, c.width, c.height);
-      ctx.drawImage(loadedImg, 0, 0, c.width, c.height);
-
-      lastDrawnCanvasRef.current = c;
-
-      // Reset history stacks only when switching to a completely new source image
-      if (resultUrl !== lastInternalStrokeUrlRef.current) {
-        setUndoStack([]);
-        setRedoStack([]);
+      if (!c) {
+        // If canvas is not yet mounted in the DOM, retry on next frame
+        requestAnimationFrame(paint);
+        return;
       }
 
-      // Load original image to base canvas for restore brush
-      const orig = new Image();
-      if (job.sourceUrl.startsWith('http') && !job.sourceUrl.startsWith('blob:')) {
-        orig.crossOrigin = 'anonymous';
+      // If already painted on this exact canvas element with this resultUrl, skip
+      if (lastDrawnCanvasRef.current === c && lastPaintedUrlRef.current === resultUrl) {
+        return;
       }
-      orig.onload = () => {
-        if (cancelled) return;
-        const base = document.createElement('canvas');
-        base.width = c.width;
-        base.height = c.height;
-        const bCtx = base.getContext('2d');
-        if (bCtx) {
-          bCtx.drawImage(orig, 0, 0, base.width, base.height);
-          baseImgCanvasRef.current = base;
+
+      const img = new Image();
+      if (resultUrl.startsWith('http') && !resultUrl.startsWith('blob:')) {
+        img.crossOrigin = 'anonymous';
+      }
+
+      img.onload = () => {
+        if (activeJobUrlRef.current !== resultUrl) return;
+        const targetCanvas = brushCanvasRef.current;
+        if (!targetCanvas) return;
+        drawCutoutImageToCanvas(targetCanvas, img, resultUrl);
+      };
+
+      img.onerror = () => {
+        if (img.crossOrigin) {
+          const fallback = new Image();
+          fallback.onload = () => {
+            if (activeJobUrlRef.current !== resultUrl) return;
+            const targetCanvas = brushCanvasRef.current;
+            if (!targetCanvas) return;
+            drawCutoutImageToCanvas(targetCanvas, fallback, resultUrl);
+          };
+          fallback.src = resultUrl;
         }
       };
-      orig.src = job.sourceUrl;
+
+      img.src = resultUrl;
     };
 
-    img.onload = () => drawToCanvas(img);
-    img.onerror = () => {
-      if (img.crossOrigin) {
-        const fallback = new Image();
-        fallback.onload = () => drawToCanvas(fallback);
-        fallback.src = resultUrl;
-      }
-    };
-    img.src = resultUrl;
-
-    return () => {
-      cancelled = true;
-    };
-  }, [job?.id, job?.resultUrl, job?.sourceUrl, isCutoutActive]);
+    paint();
+  }, [job?.id, job?.resultUrl, job?.sourceUrl, isCutoutActive, drawCutoutImageToCanvas]);
 
   // Handle Undo trigger
   const prevUndoTrigger = useRef(undoTrigger);
@@ -937,7 +1008,21 @@ export default function BGComparator({
             LOADING / PROCESSING STATE
            ========================================================= */}
         {isProcessing || (!job.resultUrl && job.status !== 'error') ? (
-          <div className="absolute inset-0 z-30 bg-slate-950/85 backdrop-blur-2xl flex flex-col items-center justify-center p-8 text-center gap-5">
+          <div
+            className="absolute inset-0 z-30 bg-slate-950/85 backdrop-blur-2xl flex flex-col items-center justify-center p-8 text-center gap-5 select-none"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+            }}
+            onPointerMove={(e) => {
+              e.stopPropagation();
+            }}
+            onPointerUp={(e) => {
+              e.stopPropagation();
+            }}
+            onWheel={(e) => {
+              e.stopPropagation();
+            }}
+          >
             <img
               src={job.sourceUrl}
               alt="Source preview"
@@ -958,15 +1043,12 @@ export default function BGComparator({
               </p>
             </div>
 
-            <div className="relative z-10 w-full max-w-xs h-2 rounded-full bg-white/10 overflow-hidden border border-white/10">
-              <div
-                className="h-full bg-gradient-to-r from-blue-500 via-cyan-400 to-[#00FF85] transition-all duration-300 ease-out shadow-[0_0_12px_#00FF85]"
-                style={{ width: `${Math.min(100, Math.max(5, typeof job.progress === 'number' ? job.progress : 15))}%` }}
+            <div className="relative z-10 w-full max-w-xs flex items-center justify-center">
+              <ModelLoader
+                progress={typeof job.progress === 'number' ? job.progress : 0}
+                width="100%"
               />
             </div>
-            <span className="relative z-10 text-[11px] font-mono text-[#00FF85] font-bold">
-              {Math.min(100, Math.max(0, typeof job.progress === 'number' ? job.progress : 15))}% Complete
-            </span>
           </div>
         ) : (
           /* =========================================================
@@ -1076,7 +1158,21 @@ export default function BGComparator({
                     style={{ visibility: isCompareMode ? 'hidden' : 'visible' }}
                   >
                     <canvas
-                      ref={brushCanvasRef}
+                      ref={(node) => {
+                        brushCanvasRef.current = node;
+                        if (node && job?.resultUrl && lastPaintedUrlRef.current !== job.resultUrl) {
+                          const img = new Image();
+                          if (job.resultUrl.startsWith('http') && !job.resultUrl.startsWith('blob:')) {
+                            img.crossOrigin = 'anonymous';
+                          }
+                          img.onload = () => {
+                            if (brushCanvasRef.current === node && job?.resultUrl) {
+                              drawCutoutImageToCanvas(node, img, job.resultUrl);
+                            }
+                          };
+                          img.src = job.resultUrl;
+                        }
+                      }}
                       className={`pointer-events-auto rounded-xl shadow-2xl touch-none ${isSpaceHeld || cutoutTool === 'move'
                           ? isPanning ? 'cursor-grabbing' : 'cursor-grab'
                           : 'cursor-crosshair'
@@ -1143,6 +1239,11 @@ export default function BGComparator({
                         alt={job.name}
                         className="w-full h-full object-contain pointer-events-none select-none"
                         style={{ filter: combinedFilter, clipPath: cropClipPath, imageRendering: 'auto' }}
+                        onLoad={() => {
+                          if (job?.model === 'diablo') {
+                            console.log(`[Diablo Model] 🖼️ Diablo cutout rendered in viewport stage display`);
+                          }
+                        }}
                       />
                     </div>
                   </div>

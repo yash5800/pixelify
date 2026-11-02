@@ -12,5 +12,6 @@ out/
 # environment variables
 .env
 .env*.local
+.env.example
 
 /public/litert/

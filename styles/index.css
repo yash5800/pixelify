@@ -177,10 +177,12 @@ html.light .bg-white\/10:hover {
 
 /* Giant Typography for Footer (matching reference image) */
 .footer-giant-title {
-    font-size: clamp(4.5rem, 15vw, 19rem);
+    width: 100%;
+    white-space: nowrap;
+    font-size: clamp(2rem, 15.5vw, 16rem);
     font-weight: 900;
     line-height: 0.85;
-    letter-spacing: -0.06em;
+    letter-spacing: -0.04em;
     text-transform: uppercase;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.2) 60%, rgba(255, 255, 255, 0.02) 100%);
     -webkit-background-clip: text;
