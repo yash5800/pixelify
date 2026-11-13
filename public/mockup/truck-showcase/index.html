@@ -1,0 +1,1704 @@
+<!doctype html>
+<!-- Backdrop: Rock058 (Poly Haven, CC0) via Wikimedia Commons -->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pixelify — Keep Pixels On Track</title>
+<style>
+  @font-face {
+    font-family: "Inter";
+    src: url("./fonts/inter-var-latin.woff2") format("woff2");
+    font-weight: 400 700;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: "Minecrafter";
+    src: url("./fonts/Minecrafter.Reg.ttf") format("truetype");
+    font-weight: 400;
+    font-display: swap;
+  }
+
+  :root {
+    --canvas: #050605;
+    --panel: #0b0c0a;
+    --ink: #f4f5f1;
+    --muted: #969c92;
+    --muted-2: #6e746b;
+    --lime: #c9fb5a;
+    --lime-deep: #a8e83e;
+    --mint: #00ff85;
+    --coral: #ff6680;
+    --teal: #35e6b2;
+    --hair: rgba(255, 255, 255, 0.08);
+    --radius: clamp(28px, 3vw, 44px);
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-spring: cubic-bezier(0.34, 1.36, 0.64, 1);
+  }
+
+  * { box-sizing: border-box; }
+
+  a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--lime);
+    outline-offset: 3px;
+  }
+
+  html, body { height: 100%; }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: "Inter", "Helvetica Neue", Arial, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* ——— Panel ——— */
+  .showcase {
+    position: relative;
+    width: 100%;
+    height: 100dvh;
+    min-height: 640px;
+    isolation: isolate;
+    overflow: hidden;
+    background:
+      radial-gradient(54% 54% at 58% 50%, rgba(154, 255, 84, 0.11), transparent 64%),
+      radial-gradient(38% 42% at 88% 2%, rgba(255, 255, 255, 0.045), transparent 74%),
+      radial-gradient(44% 44% at 4% 100%, rgba(0, 255, 133, 0.05), transparent 70%),
+      linear-gradient(176deg, #0f110d 0%, #080907 48%, #0a0c08 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      inset 0 0 180px rgba(0, 0, 0, 0.46);
+  }
+
+  .showcase::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='180' height='180' filter='url(%23n)' opacity='0.4'/></svg>");
+    opacity: 0.16;
+    mix-blend-mode: soft-light;
+  }
+
+  .showcase::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+      inset 0 -90px 140px rgba(0, 0, 0, 0.4);
+  }
+
+  /* ——— Headline / lead ——— */
+  .ts-copy {
+    position: absolute;
+    z-index: 8;
+    top: clamp(104px, 11vw, 142px);
+    left: clamp(26px, 3.4vw, 54px);
+    width: min(64%, 840px);
+    pointer-events: none;
+  }
+
+  .ts-title {
+    margin: 0;
+    font-size: min(clamp(58px, 6.9vw, 118px), 12.6vh);
+    font-weight: 500;
+    line-height: 0.92;
+    letter-spacing: -0.055em;
+    color: #f7f8f4;
+    text-wrap: balance;
+    text-shadow: 0 2px 18px rgba(0, 0, 0, 0.24);
+  }
+
+  .ts-title .line { display: block; }
+  .ts-title .line:last-child { padding-left: 0.055em; }
+
+  .ts-aside {
+    position: absolute;
+    z-index: 9;
+    top: clamp(128px, 12vw, 158px);
+    right: clamp(26px, 3.4vw, 54px);
+    width: min(32%, 420px);
+  }
+
+  .ts-aside p {
+    margin: 0;
+    color: #a9afa4;
+    font-size: 14.5px;
+    font-weight: 400;
+    line-height: 1.55;
+    letter-spacing: -0.012em;
+  }
+
+  .ts-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 26px;
+    height: 52px;
+    padding: 0 26px;
+    border: 0;
+    border-radius: 100px;
+    background: linear-gradient(180deg, #e3ff9d 0%, #c9fb5c 50%, #b4ee43 100%);
+    color: #0a1503;
+    font-size: 13.5px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow:
+      0 12px 38px rgba(190, 250, 80, 0.3),
+      0 1px 0 rgba(255, 255, 255, 0.8) inset,
+      0 -2px 0 rgba(104, 152, 16, 0.3) inset;
+    transition: transform 0.2s var(--ease), box-shadow 0.2s ease, filter 0.2s ease;
+  }
+
+  .ts-cta svg { transition: transform 0.25s var(--ease); }
+  .ts-cta:hover { transform: translateY(-2px); box-shadow: 0 16px 44px rgba(188, 250, 78, 0.36), 0 1px 0 rgba(255, 255, 255, 0.8) inset; }
+  .ts-cta:hover svg { transform: translate(2px, -2px); }
+  .ts-cta:active { transform: translateY(0) scale(0.97); }
+
+  /* ——— 3D stage ——— */
+  .ts-stage {
+    position: absolute;
+    z-index: 4;
+    inset: 0;
+    touch-action: pan-y;
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+    transition: opacity 1.15s var(--ease), transform 1.3s var(--ease);
+  }
+
+  .ts-stage.is-ready { opacity: 1; transform: translateY(0) scale(1); }
+
+  #truck-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .stage-halo {
+    position: absolute;
+    left: 60.2%;
+    top: 52%;
+    width: min(44.4%, 660px);
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background:
+      radial-gradient(circle, rgba(180, 255, 116, 0.14) 0%, rgba(122, 255, 94, 0.07) 34%, transparent 66%);
+    filter: blur(12px);
+    pointer-events: none;
+  }
+
+  .stage-loader {
+    position: absolute;
+    left: 62%;
+    top: 57.5%;
+    width: 92px;
+    height: 92px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 1px solid rgba(201, 251, 90, 0.22);
+    transition: opacity 0.6s ease;
+  }
+
+  .stage-loader::before,
+  .stage-loader::after {
+    content: "";
+    position: absolute;
+    inset: 12px;
+    border-radius: 50%;
+    border: 1px solid rgba(201, 251, 90, 0.14);
+  }
+
+  .stage-loader::after {
+    inset: 26px;
+    border-color: rgba(201, 251, 90, 0.4);
+    border-top-color: transparent;
+    border-left-color: transparent;
+    animation: spin 1.6s linear infinite;
+  }
+
+  .ts-stage.is-ready .stage-loader { opacity: 0; pointer-events: none; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .ts-vertical {
+    position: absolute;
+    z-index: 4;
+    right: 3.6%;
+    top: 26%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: rgba(232, 238, 222, 0.38);
+    font-size: 7.6px;
+    font-weight: 600;
+    letter-spacing: 0.24em;
+    writing-mode: vertical-rl;
+  }
+
+  .ts-vertical::before {
+    content: "";
+    width: 1px;
+    height: 34px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), transparent);
+  }
+
+  .ts-vertical::after {
+    content: "";
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--lime);
+    box-shadow: 0 0 9px rgba(201, 251, 90, 0.65);
+  }
+
+  /* ——— Feature cards ——— */
+  .ts-cards {
+    position: absolute;
+    z-index: 10;
+    left: clamp(34px, 5vw, 84px);
+    bottom: 44px;
+    width: 690px;
+    height: 272px;
+    pointer-events: none;
+    --cards-w: 1;
+    --cards-h: 1;
+    transform: scale(var(--cards-w));
+    scale: var(--cards-h);
+    transform-origin: left bottom;
+  }
+
+  .ts-card {
+    --r: 0deg;
+    position: absolute;
+    bottom: 0;
+    width: 228px;
+    min-height: 248px;
+    padding: 18px 18px 16px;
+    border: 1px solid rgba(10, 20, 10, 0.08);
+    border-radius: 22px;
+    color: #101a0e;
+    pointer-events: auto;
+    transform: rotate(var(--r));
+    transform-origin: 50% 90%;
+    box-shadow:
+      0 34px 56px rgba(0, 0, 0, 0.46),
+      0 8px 16px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.55),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.12);
+    transition: transform 0.45s var(--ease), box-shadow 0.45s var(--ease), filter 0.35s ease;
+    animation: card-in 1s var(--ease) both;
+    will-change: transform;
+  }
+
+  .ts-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.3'/></svg>");
+    opacity: 0.22;
+    mix-blend-mode: soft-light;
+  }
+
+  .ts-card:nth-child(1) { left: 0; z-index: 3; --r: -8deg; animation-delay: 0.34s; }
+  .ts-card:nth-child(2) { left: 204px; z-index: 2; width: 234px; --r: -1.5deg; animation-delay: 0.43s; }
+  .ts-card:nth-child(3) { left: 412px; z-index: 1; width: 238px; --r: 7deg; animation-delay: 0.52s; }
+  .ts-card:nth-child(2) .ts-card-foot,
+  .ts-card:nth-child(3) .ts-card-foot { display: none; }
+
+  .ts-card--coral {
+    background:
+      radial-gradient(120% 90% at 18% 8%, rgba(255, 224, 210, 0.52), transparent 54%),
+      linear-gradient(150deg, #ffa89d 0%, #ff7488 48%, #f4557a 100%);
+  }
+
+  .ts-card--teal {
+    background:
+      radial-gradient(120% 100% at 20% 4%, rgba(213, 255, 239, 0.55), transparent 56%),
+      linear-gradient(150deg, #6ff8d0 0%, #3ae7b7 52%, #17d49f 100%);
+  }
+
+  .ts-card--paper {
+    background:
+      radial-gradient(110% 90% at 30% 4%, #ffffff, transparent 58%),
+      linear-gradient(150deg, #f6f6f1 0%, #e6e8e1 58%, #d4d8cf 100%);
+  }
+
+  .ts-card-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .ts-card-icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 34px;
+    height: 34px;
+    border: 1px solid rgba(255, 255, 255, 0.52);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.32);
+    color: #0d1a0b;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  }
+
+  .ts-card h3 {
+    margin: 2px 0 0;
+    font-size: 19px;
+    font-weight: 650;
+    line-height: 1.05;
+    letter-spacing: -0.035em;
+  }
+
+  .ts-card p {
+    position: relative;
+    z-index: 1;
+    margin: 15px 0 0;
+    color: rgba(12, 26, 10, 0.68);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.5;
+    letter-spacing: -0.005em;
+  }
+
+  .ts-card-foot {
+    position: absolute;
+    z-index: 2;
+    left: 18px;
+    right: 18px;
+    bottom: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .ts-card-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 28px;
+    padding: 0 14px;
+    border-radius: 100px;
+    background: #0b110a;
+    color: #f3f5ee;
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-decoration: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+    transition: transform 0.2s var(--ease), background 0.2s ease;
+  }
+
+  .ts-card-pill:hover { background: #182016; }
+  .ts-card-pill:active { transform: scale(0.95); }
+
+  .ts-card-arrow {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid rgba(10, 25, 8, 0.16);
+    background: rgba(255, 255, 255, 0.22);
+    color: #0d1a0b;
+  }
+
+  @keyframes card-in {
+    from { opacity: 0; transform: translateY(38px) rotate(var(--r)) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) rotate(var(--r)) scale(1); }
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .ts-card:hover {
+      transform: translateY(-12px) rotate(0deg) scale(1.025);
+      box-shadow: 0 44px 70px rgba(0, 0, 0, 0.55), 0 12px 22px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      z-index: 9;
+      filter: saturate(1.04);
+    }
+  }
+
+  /* ——— Stat ——— */
+  .ts-stat {
+    position: absolute;
+    z-index: 8;
+    right: clamp(40px, 8.8vw, 170px);
+    bottom: 104px;
+  }
+
+  .ts-stat-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 18px;
+  }
+
+  .ts-stat-number {
+    font-size: clamp(54px, 5.2vw, 78px);
+    font-weight: 500;
+    line-height: 0.82;
+    letter-spacing: -0.065em;
+    color: #fafbf7;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ts-avatars {
+    display: flex;
+    align-items: center;
+    padding-bottom: 5px;
+  }
+
+  .ts-avatar {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    margin-left: -11px;
+    border: 2px solid #0b0c0a;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  .ts-avatar:first-child { margin-left: 0; }
+  .ts-avatar--1 { background: radial-gradient(circle at 32% 24%, #ffd0a3, #b86a4d 58%, #5f3027); }
+  .ts-avatar--2 { background: radial-gradient(circle at 32% 24%, #b8e7ff, #3d7f9c 58%, #1f3f4f); }
+  .ts-avatar--3 { background: radial-gradient(circle at 32% 24%, #d8ffc0, #4b9a4b 58%, #24541f); }
+
+  .ts-avatar--plus {
+    background: #1a1d18;
+    border-color: #0b0c0a;
+    color: #d9ddcf;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .ts-stat-copy {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 13px;
+    color: #9da398;
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+  }
+
+  .ts-stat-copy .dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--mint);
+    box-shadow: 0 0 8px rgba(0, 255, 133, 0.8);
+  }
+
+  /* ——— Bottom dial / dock ——— */
+  .ts-dock {
+    position: absolute;
+    z-index: 6;
+    left: calc(clamp(34px, 5vw, 84px) + 330px);
+    right: 0;
+    bottom: 0;
+    height: 74px;
+    border-radius: 32px 32px 0 0;
+    background:
+      linear-gradient(180deg, #3d4038 0%, #2a2d26 12%, #1d201a 46%, #131510 100%);
+    box-shadow:
+      0 -24px 60px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      inset 0 22px 36px rgba(255, 255, 255, 0.035);
+  }
+
+  .ts-dock::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 1px;
+    border-radius: 34px 34px 0 0;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.26) 16%, rgba(255, 255, 255, 0.2) 84%, rgba(255, 255, 255, 0));
+  }
+
+  .ts-dock::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 30px;
+    border-radius: 34px 34px 0 0;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0));
+  }
+
+  .ts-dial {
+    position: absolute;
+    z-index: 12;
+    left: 600px;
+    bottom: -18px;
+    pointer-events: auto;
+    width: 118px;
+    height: 118px;
+    transform: translateX(-50%);
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.17);
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 34% 18%, #262821 0%, #121410 48%, #060705 100%);
+    color: #f4f6ee;
+    cursor: pointer;
+    text-decoration: none;
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.045),
+      0 20px 44px rgba(0, 0, 0, 0.62),
+      0 4px 10px rgba(0, 0, 0, 0.45),
+      inset 0 1px 0 rgba(255, 255, 255, 0.22),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.1),
+      inset 0 -12px 24px rgba(0, 0, 0, 0.55);
+    transition: transform 0.25s var(--ease), box-shadow 0.25s ease;
+    animation: dial-in 0.9s ease 0.72s both;
+  }
+
+  @keyframes dial-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .ts-dial:hover { transform: translateX(-50%) translateY(-3px); box-shadow: 0 30px 58px rgba(0, 0, 0, 0.6), 0 8px 16px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -12px 24px rgba(0, 0, 0, 0.55); }
+  .ts-dial:active { transform: translateX(-50%) translateY(0) scale(0.975); }
+
+  .ts-dial .ring-text {
+    position: absolute;
+    inset: 0;
+    animation: dial-spin 22s linear infinite;
+  }
+
+  .ts-dial:hover .ring-text { animation-play-state: paused; }
+
+  @keyframes dial-spin { to { transform: rotate(360deg); } }
+
+  .ts-dial .ring-text text {
+    fill: #f2f4ea;
+    font-size: 9.6px;
+    font-weight: 500;
+    letter-spacing: 0.075em;
+    font-family: "Inter", sans-serif;
+  }
+
+  .ts-dial .dial-center {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: none;
+    color: #f4f7ec;
+  }
+
+  .ts-dial svg.arrow { transition: transform 0.25s var(--ease); }
+  .ts-dial:hover svg.arrow { transform: translateY(2px); }
+
+  /* ——— Entrance ——— */
+  .ts-copy, .ts-aside, .ts-stat {
+    animation: rise 1s var(--ease) both;
+  }
+
+  .ts-copy { animation-delay: 0.06s; }
+  .ts-aside { animation-delay: 0.16s; }
+  .ts-stat { animation-delay: 0.62s; }
+
+  .ts-dock {
+    animation: rise-dock 1s var(--ease) 0.5s both;
+  }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes rise-dock {
+    from { opacity: 0; transform: translateY(18px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ——— Responsive ——— */
+  @media (min-width: 1600px) {
+    .ts-cards { --cards-w: 1.08; }
+  }
+
+  @media (min-width: 1800px) {
+    .ts-cards { --cards-w: 1.16; }
+  }
+
+  @media (min-width: 2100px) {
+    .ts-cards { --cards-w: 1.26; }
+  }
+
+  /* Short viewports: shrink the cluster so it never climbs over the truck. */
+  @media (min-width: 1181px) and (max-height: 900px) {
+    .ts-cards { --cards-h: 0.95; }
+  }
+
+  @media (min-width: 1181px) and (max-height: 840px) {
+    .ts-cards { --cards-h: 0.88; }
+  }
+
+  @media (min-width: 1181px) and (max-height: 780px) {
+    .ts-cards { --cards-h: 0.81; }
+  }
+
+  @media (min-width: 1181px) and (max-height: 720px) {
+    .ts-cards { --cards-h: 0.74; }
+  }
+
+  @media (min-width: 1181px) and (max-height: 660px) {
+    .ts-cards { --cards-h: 0.67; }
+  }
+
+  @media (max-width: 1400px) and (min-width: 1181px) {
+    .ts-cards { --cards-w: 0.88; }
+  }
+
+  @media (max-width: 1260px) and (min-width: 1181px) {
+    .ts-cards { --cards-w: 0.82; }
+  }
+
+  @media (max-width: 1180px) {
+    .showcase { height: auto; min-height: 0; }
+    .ts-copy { position: relative; inset: auto; width: auto; padding: 44px 24px 0; }
+    .ts-title { font-size: clamp(48px, 9vw, 72px); }
+    .ts-aside { position: relative; inset: auto; width: auto; padding: 24px 24px 0; }
+    .ts-aside p { max-width: 440px; }
+    .ts-stage { position: relative; inset: auto; height: 360px; margin-top: 8px; }
+    .ts-cards { position: relative; inset: auto; margin: 8px 24px 0; transform: scale(0.92); transform-origin: left top; height: 280px; }
+    .ts-stat { position: relative; inset: auto; padding: 30px 24px 0; }
+    .ts-stat-number { font-size: 64px; }
+    .ts-stat-row { align-items: center; gap: 14px; }
+    .ts-stat-copy { white-space: normal; max-width: 280px; line-height: 1.35; }
+    .ts-dock, .ts-dial, .ts-vertical { display: none; }
+    .showcase { padding-bottom: 34px; }
+  }
+
+  @media (max-width: 640px) {
+    .ts-cards { transform: scale(0.7); transform-origin: left top; width: 480px; height: 190px; margin-left: 22px; }
+    .ts-card:nth-child(3) { display: none; }
+    .ts-stage { height: 280px; }
+    .ts-title { font-size: clamp(42px, 12.4vw, 58px); }
+    .ts-cta { height: 44px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+    .ts-stage { opacity: 1; transform: none; }
+  }
+</style>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three.module.js",
+      "three/addons/": "./vendor/addons/"
+    }
+  }
+</script>
+</head>
+<body>
+  <main class="showcase" id="showcase">
+    <div class="ts-copy">
+      <h1 class="ts-title">
+        <span class="line">Keep Pixels</span>
+        <span class="line">On Track</span>
+      </h1>
+    </div>
+
+    <aside class="ts-aside">
+      <p>Take every image the last mile. Upscale to 8×, cut out the subject and finish the frame — all on-device.</p>
+      <a class="ts-cta" href="/upscaler/">
+        Start now
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg>
+      </a>
+    </aside>
+
+    <div class="ts-stage" id="stage">
+      <div class="stage-halo" aria-hidden="true"></div>
+      <div class="stage-loader" aria-hidden="true"></div>
+      <canvas id="truck-canvas" aria-label="Pixelify tow truck carrying the Pixelify wordmark"></canvas>
+      <span class="ts-vertical" aria-hidden="true">STUDIO ENGINE</span>
+    </div>
+
+    <div class="ts-cards">
+      <article class="ts-card ts-card--coral">
+        <div class="ts-card-head">
+          <span class="ts-card-icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.6"/><path d="M8.1 8.1 12 12M20 4 8.2 15.8"/><circle cx="6" cy="18" r="2.6"/><path d="m14.8 14.8 5.2 5.2"/></svg>
+          </span>
+          <h3>Background<br>Removal</h3>
+        </div>
+        <p>Lift any subject out with edge-aware alpha mattes. Hair, fur and glass keep their detail — no green screen.</p>
+        <div class="ts-card-foot">
+          <a class="ts-card-pill" href="/bg_remove/">Try cutout</a>
+          <span class="ts-card-arrow" aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M7 7h10v10"/></svg>
+          </span>
+        </div>
+      </article>
+
+      <article class="ts-card ts-card--teal">
+        <div class="ts-card-head">
+          <span class="ts-card-icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><path d="M4 14h3v6H5a1 1 0 0 1-1-1v-5ZM20 14h-3v6h2a1 1 0 0 0 1-1v-5Z"/></svg>
+          </span>
+          <h3>8× Upscale</h3>
+        </div>
+        <p>Resolve small frames into print-ready detail with Vitality and Pixel-Dance. Fast, tiled and shaped for real photos.</p>
+        <div class="ts-card-foot">
+          <a class="ts-card-pill" href="/upscaler/">Upscale now</a>
+          <span class="ts-card-arrow" aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M7 7h10v10"/></svg>
+          </span>
+        </div>
+      </article>
+
+      <article class="ts-card ts-card--paper">
+        <div class="ts-card-head">
+          <span class="ts-card-icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 1.7 4.3L18 9l-4.3 1.7L12 15l-1.7-4.3L6 9l4.3-1.7L12 3Z"/><path d="m18.5 15 .9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9.9-2.1Z"/></svg>
+          </span>
+          <h3>Studio<br>Finish</h3>
+        </div>
+        <p>Backdrops, shadows, crops and type live in one canvas. Compose the frame and export it without leaving the tab.</p>
+        <div class="ts-card-foot">
+          <a class="ts-card-pill" href="/bg_remove/">Open studio</a>
+          <span class="ts-card-arrow" aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M7 7h10v10"/></svg>
+          </span>
+        </div>
+      </article>
+
+    <a class="ts-dial" href="/upscaler/" aria-label="Explore the studio">
+      <svg class="ring-text" viewBox="0 0 114 114" aria-hidden="true">
+        <defs>
+          <path id="dialPath" d="M 57,57 m -43,0 a 43,43 0 1,1 86,0 a 43,43 0 1,1 -86,0" />
+        </defs>
+        <text>
+          <textPath href="#dialPath" startOffset="0%">Explore more · Explore more · </textPath>
+        </text>
+      </svg>
+      <span class="dial-center">
+        <svg class="arrow" width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.4v16.4M5.9 13.6 12 19.7l6.1-6.1M8.6 3.4h6.8"/></svg>
+      </span>
+    </a>
+    </div>
+
+    <div class="ts-stat">
+      <div class="ts-stat-row">
+        <span class="ts-stat-number">1.2M</span>
+        <span class="ts-avatars" aria-hidden="true">
+          <span class="ts-avatar ts-avatar--1">A</span>
+          <span class="ts-avatar ts-avatar--2">M</span>
+          <span class="ts-avatar ts-avatar--3">J</span>
+          <span class="ts-avatar ts-avatar--plus">+</span>
+        </span>
+      </div>
+      <div class="ts-stat-copy">
+        <i class="dot"></i>
+        Images delivered at full resolution
+      </div>
+    </div>
+
+
+    <div class="ts-dock" aria-hidden="true"></div>
+  </main>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+    const stage = document.getElementById('stage');
+    const canvas = document.getElementById('truck-canvas');
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: true,
+      powerPreference: 'high-performance',
+    });
+    const params = new URLSearchParams(location.search);
+    const num = (key, fallback) => {
+      const v = Number(params.get(key));
+      return Number.isFinite(v) && params.has(key) ? v : fallback;
+    };
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.18;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(29, 1, 0.1, 200);
+    const baseCamera = new THREE.Vector3(num('cx', 10.6), num('cy', 6.4), num('cz', 17.5));
+    const lookAt = new THREE.Vector3(0, num('ly', 2.15), 0);
+    camera.position.copy(baseCamera);
+    camera.lookAt(lookAt);
+
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    if ('environmentIntensity' in scene) scene.environmentIntensity = 0.85;
+
+    scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x151a12, 0.55));
+
+    const key = new THREE.DirectionalLight(0xfff6e8, 3.35);
+    key.position.set(9, 13, 10);
+    key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    key.shadow.camera.left = -11;
+    key.shadow.camera.right = 11;
+    key.shadow.camera.top = 11;
+    key.shadow.camera.bottom = -11;
+    key.shadow.camera.near = 1;
+    key.shadow.camera.far = 55;
+    key.shadow.bias = -0.0006;
+    key.shadow.normalBias = 0.02;
+    scene.add(key);
+
+    const rim = new THREE.DirectionalLight(0x8bffb8, 4.2);
+    rim.position.set(-11, 7, -7);
+    scene.add(rim);
+
+    const fill = new THREE.DirectionalLight(0x9ac8ff, 1.7);
+    fill.position.set(-6, 2.5, 11);
+    scene.add(fill);
+
+    const front = new THREE.DirectionalLight(0xffd9b8, 1.35);
+    front.position.set(-9, 8, 12);
+    scene.add(front);
+
+    const under = new THREE.PointLight(0xc9fb5a, 32, 18, 2);
+    under.position.set(1.5, -1.2, 2.5);
+    scene.add(under);
+
+    // Soft landing glow behind the floating truck.
+    function glowTexture() {
+      const c = document.createElement('canvas');
+      c.width = 256;
+      c.height = 256;
+      const ctx = c.getContext('2d');
+      const g = ctx.createRadialGradient(128, 128, 4, 128, 128, 128);
+      g.addColorStop(0, 'rgba(208,255,143,0.9)');
+      g.addColorStop(0.28, 'rgba(150,255,110,0.32)');
+      g.addColorStop(0.62, 'rgba(80,255,120,0.09)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 256, 256);
+      return new THREE.CanvasTexture(c);
+    }
+
+    const backGlow = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: glowTexture(),
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        opacity: 0.62,
+      })
+    );
+    backGlow.position.set(0.4, 1.7, -5.5);
+    backGlow.scale.set(18, 18, 1);
+    scene.add(backGlow);
+
+    // Thin holographic halo behind the truck — echoes the reference's tech ring.
+    const halo = new THREE.Group();
+    halo.position.set(0.4, 1.55, -4.7);
+    const haloRing = new THREE.Mesh(
+      new THREE.RingGeometry(6.55, 6.59, 180),
+      new THREE.MeshBasicMaterial({
+        color: 0xb8ff86,
+        transparent: true,
+        opacity: 0.3,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      })
+    );
+    halo.add(haloRing);
+
+    const haloInner = new THREE.Mesh(
+      new THREE.RingGeometry(5.95, 5.97, 160),
+      new THREE.MeshBasicMaterial({
+        color: 0x7dff9e,
+        transparent: true,
+        opacity: 0.18,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      })
+    );
+    halo.add(haloInner);
+
+    for (let i = 0; i < 48; i++) {
+      const a = (i / 48) * Math.PI * 2;
+      const dot = new THREE.Mesh(
+        new THREE.PlaneGeometry(i % 4 === 0 ? 0.06 : 0.028, i % 4 === 0 ? 0.06 : 0.028),
+        new THREE.MeshBasicMaterial({
+          color: 0xd8ffb6,
+          transparent: true,
+          opacity: i % 4 === 0 ? 0.7 : 0.3,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        })
+      );
+      dot.position.set(Math.cos(a) * 6.18, Math.sin(a) * 6.18, 0.01);
+      halo.add(dot);
+    }
+    scene.add(halo);
+
+    // Contact shadow.
+    function shadowTexture() {
+      const c = document.createElement('canvas');
+      c.width = 256;
+      c.height = 256;
+      const ctx = c.getContext('2d');
+      const g = ctx.createRadialGradient(128, 128, 2, 128, 128, 124);
+      g.addColorStop(0, 'rgba(0,0,0,0.72)');
+      g.addColorStop(0.5, 'rgba(0,0,0,0.3)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 256, 256);
+      return new THREE.CanvasTexture(c);
+    }
+
+    const shadow = new THREE.Mesh(
+      new THREE.PlaneGeometry(13, 6.4),
+      new THREE.MeshBasicMaterial({
+        map: shadowTexture(),
+        transparent: true,
+        depthWrite: false,
+        opacity: 0.9,
+      })
+    );
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.position.y = -1.79;
+    scene.add(shadow);
+
+    const shadowCatcher = new THREE.Mesh(
+      new THREE.CircleGeometry(8.6, 80),
+      new THREE.ShadowMaterial({ color: 0x000000, opacity: 0.16 })
+    );
+    shadowCatcher.rotation.x = -Math.PI / 2;
+    shadowCatcher.position.y = -1.8;
+    shadowCatcher.receiveShadow = true;
+    scene.add(shadowCatcher);
+
+    // Landing rings.
+    const rings = new THREE.Group();
+    [5.1, 5.55, 6.8].forEach((r, i) => {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(r, r + (i === 2 ? 0.015 : 0.055), 160),
+        new THREE.MeshBasicMaterial({
+          color: i === 2 ? 0xb9ff75 : 0x7dff9e,
+          transparent: true,
+          opacity: i === 2 ? 0.1 : 0.26 - i * 0.035,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        })
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = -1.79 + i * 0.002;
+      rings.add(ring);
+    });
+
+    for (let i = 0; i < 36; i++) {
+      const a = (i / 36) * Math.PI * 2;
+      const tick = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.025, i % 3 === 0 ? 0.3 : 0.14),
+        new THREE.MeshBasicMaterial({
+          color: 0xc9fb5a,
+          transparent: true,
+          opacity: i % 3 === 0 ? 0.42 : 0.18,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        })
+      );
+      tick.position.set(Math.cos(a) * 6.8, -1.785, Math.sin(a) * 6.8);
+      tick.rotation.x = -Math.PI / 2;
+      tick.rotation.z = -a;
+      rings.add(tick);
+    }
+    scene.add(rings);
+
+    // Floating dust.
+    const dustCount = 90;
+    const dustPositions = new Float32Array(dustCount * 3);
+    const dustSeed = [];
+    for (let i = 0; i < dustCount; i++) {
+      dustPositions[i * 3] = (Math.random() - 0.5) * 16;
+      dustPositions[i * 3 + 1] = Math.random() * 7 - 1;
+      dustPositions[i * 3 + 2] = (Math.random() - 0.5) * 12;
+      dustSeed.push(Math.random() * Math.PI * 2);
+    }
+    const dustGeo = new THREE.BufferGeometry();
+    dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+    const dust = new THREE.Points(
+      dustGeo,
+      new THREE.PointsMaterial({
+        color: 0xdfffae,
+        size: 0.035,
+        transparent: true,
+        opacity: 0.66,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        sizeAttenuation: true,
+      })
+    );
+    scene.add(dust);
+
+    // Truck.
+    const truckPivot = new THREE.Group();
+    const baseYaw = THREE.MathUtils.degToRad(num('yaw', 152));
+    truckPivot.rotation.y = baseYaw;
+    truckPivot.rotation.z = 0.025;
+    truckPivot.position.y = 1.55;
+    scene.add(truckPivot);
+
+    // ——— Motion: a glowing light-track streaming beneath the hovering truck ———
+    const travelDir = new THREE.Vector3(Math.sin(baseYaw), 0, Math.cos(baseYaw)).normalize();
+    const TRACK_Y = 1.34;
+    const TRACK_SPAN = 20;
+
+    function streakTexture() {
+      const c = document.createElement('canvas');
+      c.width = 32;
+      c.height = 256;
+      const ctx = c.getContext('2d');
+      const g = ctx.createLinearGradient(0, 0, 0, 256);
+      g.addColorStop(0, 'rgba(255,255,255,0)');
+      g.addColorStop(0.3, 'rgba(255,255,255,0.9)');
+      g.addColorStop(0.62, 'rgba(255,255,255,0.38)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 32, 256);
+      return new THREE.CanvasTexture(c);
+    }
+
+    const streakMap = streakTexture();
+    const streakGeo = new THREE.PlaneGeometry(1, 1);
+
+    function makeStreakMats(tints, opacities) {
+      return tints.map((color, i) =>
+        new THREE.MeshBasicMaterial({
+          map: streakMap,
+          color,
+          transparent: true,
+          opacity: opacities[i],
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          side: THREE.DoubleSide,
+        })
+      );
+    }
+
+    const roadMats = makeStreakMats([0xc9fb5a, 0x9dffd0, 0xe6ffc2], [0.34, 0.48, 0.64]);
+    const airMats = makeStreakMats([0xc9fb5a, 0x9dffd0, 0xd8ffbe], [0.05, 0.09, 0.13]);
+
+    function buildSpeedField({ count, mats, yMin, yMax, spread, range, lenMin, lenMax, widMin, widMax, speedMin, speedMax }) {
+      const group = new THREE.Group();
+      group.rotation.y = baseYaw;
+      const items = [];
+      for (let i = 0; i < count; i++) {
+        const mesh = new THREE.Mesh(streakGeo, mats[Math.floor(Math.random() * mats.length)]);
+        const len = lenMin + Math.random() * (lenMax - lenMin);
+        const wid = widMin + Math.random() * (widMax - widMin);
+        mesh.scale.set(wid, len, 1);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.set(
+          (Math.random() * 2 - 1) * spread,
+          yMin + Math.random() * (yMax - yMin),
+          (Math.random() * 2 - 1) * range
+        );
+        mesh.userData.speed = speedMin + Math.random() * (speedMax - speedMin);
+        group.add(mesh);
+        items.push(mesh);
+      }
+      scene.add(group);
+      return { group, items, range };
+    }
+
+    // Bright streaks skimming the deck, plus faint high-altitude airflow.
+    const wheelField = buildSpeedField({
+      count: 30, mats: roadMats, yMin: 1.29, yMax: 1.46, spread: 4.8, range: 13,
+      lenMin: 1.4, lenMax: 4.2, widMin: 0.03, widMax: 0.075, speedMin: 6.5, speedMax: 13,
+    });
+
+    const airField = buildSpeedField({
+      count: 20, mats: airMats, yMin: 1.95, yMax: 3.9, spread: 6.6, range: 15,
+      lenMin: 2.2, lenMax: 6, widMin: 0.01, widMax: 0.022, speedMin: 3.8, speedMax: 8.6,
+    });
+
+    // ——— The light track itself ———
+    // Wheel footprint centre in world space (front + rear axle midpoints).
+    const TRACK_CENTER = new THREE.Vector3(-2.0, TRACK_Y, 3.85);
+    wheelField.group.position.set(TRACK_CENTER.x, 0, TRACK_CENTER.z);
+    airField.group.position.set(TRACK_CENTER.x, 0, TRACK_CENTER.z);
+
+    const trackGroup = new THREE.Group();
+    trackGroup.rotation.y = baseYaw;
+    trackGroup.position.copy(TRACK_CENTER);
+    scene.add(trackGroup);
+
+    function trackBedTexture() {
+      const W = 256;
+      const H = 1024;
+      const c = document.createElement('canvas');
+      c.width = W;
+      c.height = H;
+      const ctx = c.getContext('2d');
+      // A soft elliptical pool of light: no hard side walls or end caps.
+      ctx.setTransform(1, 0, 0, H / W, W / 2, H / 2);
+      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, W / 2);
+      g.addColorStop(0, 'rgba(190,255,120,0.46)');
+      g.addColorStop(0.42, 'rgba(190,255,120,0.24)');
+      g.addColorStop(0.72, 'rgba(190,255,120,0.07)');
+      g.addColorStop(1, 'rgba(190,255,120,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(-W / 2, -W / 2, W, W);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    const trackBed = new THREE.Mesh(
+      new THREE.PlaneGeometry(5.0, TRACK_SPAN + 4),
+      new THREE.MeshBasicMaterial({
+        map: trackBedTexture(),
+        color: 0xc9fb5a,
+        transparent: true,
+        opacity: 0.72,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+      })
+    );
+    trackBed.rotation.x = -Math.PI / 2;
+    trackGroup.add(trackBed);
+
+    function edgeLineTexture() {
+      const c = document.createElement('canvas');
+      c.width = 8;
+      c.height = 256;
+      const ctx = c.getContext('2d');
+      const g = ctx.createLinearGradient(0, 0, 0, 256);
+      g.addColorStop(0, 'rgba(255,255,255,0)');
+      g.addColorStop(0.24, 'rgba(255,255,255,1)');
+      g.addColorStop(0.78, 'rgba(255,255,255,1)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 8, 256);
+      return new THREE.CanvasTexture(c);
+    }
+
+    const edgeMat = new THREE.MeshBasicMaterial({
+      map: edgeLineTexture(),
+      color: 0xb9ff6e,
+      transparent: true,
+      opacity: 0.3,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    });
+
+    for (const x of [-1.72, 1.72]) {
+      const line = new THREE.Mesh(new THREE.PlaneGeometry(0.06, TRACK_SPAN), edgeMat);
+      line.rotation.x = -Math.PI / 2;
+      line.position.set(x, 0.004, 0);
+      trackGroup.add(line);
+    }
+
+    // Cross-rungs, like runway ticks, give the deck a readable surface.
+    function rungTexture() {
+      const c = document.createElement('canvas');
+      c.width = 256;
+      c.height = 8;
+      const ctx = c.getContext('2d');
+      const g = ctx.createLinearGradient(0, 0, 256, 0);
+      g.addColorStop(0, 'rgba(255,255,255,0)');
+      g.addColorStop(0.14, 'rgba(255,255,255,0.85)');
+      g.addColorStop(0.5, 'rgba(255,255,255,0.34)');
+      g.addColorStop(0.86, 'rgba(255,255,255,0.85)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 256, 8);
+      return new THREE.CanvasTexture(c);
+    }
+
+    const rungGeo = new THREE.PlaneGeometry(4.1, 0.13);
+    const rungMat = new THREE.MeshBasicMaterial({
+      map: rungTexture(),
+      color: 0xc4ff7a,
+      transparent: true,
+      opacity: 0.16,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    });
+    const rungs = [];
+    const rungStep = 1.35;
+    for (let z = -TRACK_SPAN / 2; z < TRACK_SPAN / 2; z += rungStep) {
+      const rung = new THREE.Mesh(rungGeo, rungMat.clone());
+      rung.rotation.x = -Math.PI / 2;
+      rung.position.set(0, 0.003, z);
+      trackGroup.add(rung);
+      rungs.push(rung);
+    }
+
+    // Centre dashes streaming toward the viewer.
+    const dashGeo = new THREE.PlaneGeometry(0.3, 1.35);
+    const dashStep = 2.2;
+    const dashCount = Math.round(TRACK_SPAN / dashStep);
+    const dashes = [];
+    for (let i = 0; i < dashCount; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        map: streakMap,
+        color: 0xd9ff8a,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+      });
+      const dash = new THREE.Mesh(dashGeo, mat);
+      dash.rotation.x = -Math.PI / 2;
+      dash.position.set(0, 0.006, -TRACK_SPAN / 2 + i * dashStep);
+      trackGroup.add(dash);
+      dashes.push(dash);
+    }
+
+    // ——— Air: soft camera-facing streaks rushing past the truck ———
+    function windTexture() {
+      const c = document.createElement('canvas');
+      c.width = 128;
+      c.height = 16;
+      const ctx = c.getContext('2d');
+      const g = ctx.createLinearGradient(0, 0, 128, 0);
+      g.addColorStop(0, 'rgba(255,255,255,0)');
+      g.addColorStop(0.28, 'rgba(255,255,255,0.85)');
+      g.addColorStop(0.62, 'rgba(255,255,255,0.4)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 128, 16);
+      return new THREE.CanvasTexture(c);
+    }
+
+    const windTex = windTexture();
+    const windGroup = new THREE.Group();
+    windGroup.rotation.y = baseYaw;
+    scene.add(windGroup);
+    const windItems = [];
+    for (let i = 0; i < 14; i++) {
+      const mat = new THREE.SpriteMaterial({
+        map: windTex,
+        color: i % 3 === 0 ? 0x9dffd0 : 0xd8ffb0,
+        transparent: true,
+        opacity: 0.06 + Math.random() * 0.14,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        rotation: -0.18,
+      });
+      const sprite = new THREE.Sprite(mat);
+      sprite.position.set(
+        (Math.random() - 0.5) * 9,
+        2.2 + Math.random() * 2.4,
+        (Math.random() - 0.5) * 20
+      );
+      sprite.scale.set(2.6 + Math.random() * 3.6, 0.05 + Math.random() * 0.08, 1);
+      sprite.userData.speed = 4.5 + Math.random() * 7;
+      windGroup.add(sprite);
+      windItems.push(sprite);
+    }
+
+    if (reduceMotion) {
+      wheelField.group.visible = false;
+      airField.group.visible = false;
+      trackGroup.visible = false;
+      windGroup.visible = false;
+    }
+
+    // Track markings roll backwards (+z) because local -z is the truck's nose.
+    function driftSpeedField(field, dt, scale) {
+      for (const m of field.items) {
+        m.position.z += m.userData.speed * dt * scale;
+        if (m.position.z > field.range) m.position.z -= field.range * 2;
+      }
+    }
+
+    // ——— Tire dust ———
+    function puffTexture() {
+      const c = document.createElement('canvas');
+      c.width = c.height = 128;
+      const ctx = c.getContext('2d');
+      const g = ctx.createRadialGradient(64, 64, 2, 64, 64, 62);
+      g.addColorStop(0, 'rgba(226,255,198,0.9)');
+      g.addColorStop(0.34, 'rgba(190,240,160,0.32)');
+      g.addColorStop(1, 'rgba(150,200,120,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 128, 128);
+      return new THREE.CanvasTexture(c);
+    }
+
+    const puffMap = puffTexture();
+    const puffPool = [];
+    const PUFF_COUNT = 22;
+    for (let i = 0; i < PUFF_COUNT; i++) {
+      const material = new THREE.SpriteMaterial({
+        map: puffMap,
+        color: 0xe6ffcf,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      });
+      const sprite = new THREE.Sprite(material);
+      sprite.visible = false;
+      scene.add(sprite);
+      puffPool.push({ sprite, life: 0, maxLife: 1, vel: new THREE.Vector3() });
+    }
+    let puffCursor = 0;
+    let puffTimer = 0;
+
+    const rearWheels = [];
+    const tireNodes = [];
+    const wheelWorld = new THREE.Vector3();
+
+    // ——— Per-tire contact glow + skid smear ———
+    function contactGlowTexture() {
+      const c = document.createElement('canvas');
+      c.width = c.height = 128;
+      const ctx = c.getContext('2d');
+      const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+      g.addColorStop(0, 'rgba(255,255,255,1)');
+      g.addColorStop(0.26, 'rgba(255,255,255,0.55)');
+      g.addColorStop(0.62, 'rgba(255,255,255,0.14)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 128, 128);
+      return new THREE.CanvasTexture(c);
+    }
+
+    const glowMap = contactGlowTexture();
+    const wheelFx = [];
+
+    function buildWheelFx() {
+      for (const wheel of tireNodes) {
+        const glow = new THREE.Sprite(
+          new THREE.SpriteMaterial({
+            map: glowMap,
+            color: 0xc8ff7a,
+            transparent: true,
+            opacity: 0.36,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+          })
+        );
+        glow.scale.set(1.1, 0.3, 1);
+        scene.add(glow);
+
+        const smear = new THREE.Sprite(
+          new THREE.SpriteMaterial({
+            map: streakMap,
+            color: 0xc9fb5a,
+            transparent: true,
+            opacity: 0.34,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+          })
+        );
+        smear.scale.set(2.9, 0.055, 1);
+        scene.add(smear);
+
+        if (reduceMotion) {
+          glow.visible = false;
+          smear.visible = false;
+        }
+        wheelFx.push({ wheel, glow, smear, phase: Math.random() * Math.PI * 2 });
+      }
+    }
+
+    function spawnPuff() {
+      if (!rearWheels.length) return;
+      const wheel = rearWheels[Math.floor(Math.random() * rearWheels.length)];
+      wheel.getWorldPosition(wheelWorld);
+      const puff = puffPool[puffCursor++ % PUFF_COUNT];
+      puff.sprite.position.set(
+        wheelWorld.x + (Math.random() - 0.5) * 0.26,
+        wheelWorld.y - 0.44 - Math.random() * 0.1,
+        wheelWorld.z + (Math.random() - 0.5) * 0.26
+      );
+      puff.maxLife = 0.8 + Math.random() * 0.6;
+      puff.life = puff.maxLife;
+      puff.vel.copy(travelDir).multiplyScalar(1.6 + Math.random() * 2.2);
+      puff.vel.y += 0.12 + Math.random() * 0.34;
+      puff.vel.x += (Math.random() - 0.5) * 0.6;
+      puff.vel.z += (Math.random() - 0.5) * 0.6;
+      puff.sprite.scale.set(0.24, 0.2, 1);
+      puff.sprite.material.opacity = 0.6;
+      puff.sprite.visible = true;
+    }
+
+    function updatePuffs(dt) {
+      for (const p of puffPool) {
+        if (!p.sprite.visible) continue;
+        p.life -= dt;
+        if (p.life <= 0) {
+          p.sprite.visible = false;
+          continue;
+        }
+        p.sprite.position.addScaledVector(p.vel, dt);
+        p.vel.multiplyScalar(1 - Math.min(0.9, dt * 1.1));
+        const t = 1 - p.life / p.maxLife;
+        p.sprite.scale.set(0.24 + t * 2.1, 0.2 + t * 1.35, 1);
+        p.sprite.material.opacity = (1 - t) * 0.62;
+      }
+    }
+
+    let truckReady = false;
+
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath('./vendor/draco/');
+
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.setDRACOLoader(dracoLoader);
+    gltfLoader.load(
+      './truck.glb',
+      (gltf) => {
+        const model = gltf.scene;
+        const box = new THREE.Box3().setFromObject(model);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+
+        model.position.set(-center.x, -box.min.y, -center.z);
+        model.traverse((child) => {
+          if (/^tire_0[1-4]$/.test(child.name)) {
+            tireNodes.push(child);
+            if (child.name === 'tire_03' || child.name === 'tire_04') rearWheels.push(child);
+          }
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+            if (child.material) {
+              child.material.envMapIntensity = 0.9;
+            }
+          }
+        });
+
+        // The model is ~19.4 units long; bring it down to stage scale.
+        const targetLength = num('tl', 12.7);
+        const modelScale = Math.min(targetLength / size.z, targetLength / size.x, 7 / size.y);
+        truckPivot.scale.setScalar(modelScale);
+        truckPivot.add(model);
+        buildWheelFx();
+
+        truckReady = true;
+        requestAnimationFrame(() => stage.classList.add('is-ready'));
+      },
+      undefined,
+      (err) => {
+        console.error('Truck failed to load', err);
+        stage.classList.add('is-ready');
+        stage.querySelector('.stage-loader').style.display = 'none';
+      }
+    );
+
+    // Pointer parallax.
+    let parallaxX = 0;
+    let parallaxY = 0;
+    let targetX = 0;
+    let targetY = 0;
+
+    window.addEventListener('pointermove', (e) => {
+      const rect = stage.getBoundingClientRect();
+      const nx = (e.clientX - rect.left) / rect.width - 0.5;
+      const ny = (e.clientY - rect.top) / rect.height - 0.5;
+      targetX = THREE.MathUtils.clamp(nx, -0.7, 0.7);
+      targetY = THREE.MathUtils.clamp(ny, -0.7, 0.7);
+    }, { passive: true });
+
+    let frameScale = 1;
+
+    // The canvas is full-bleed so glows and rings never clip against the old
+    // inset stage. The 3D framing still matches the layout: a wider frustum,
+    // shifted so the scene sits exactly where the inset stage used to be.
+    const BASE_FOV = 29;
+    const VIEW = { l: 0.32, r: 0.92, t: 0.267, b: 0.884 };
+    const stacked = window.matchMedia('(max-width: 1180px)');
+    const clampFov = (f) => Math.min(f, 78);
+
+    function resize() {
+      const rect = stage.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      renderer.setSize(rect.width, rect.height, false);
+
+      if (stacked.matches) {
+        camera.clearViewOffset();
+        camera.fov = BASE_FOV;
+        camera.aspect = rect.width / rect.height;
+        frameScale = Math.max(1, 1.55 / camera.aspect);
+        camera.updateProjectionMatrix();
+        return;
+      }
+
+      const vw = VIEW.r - VIEW.l;
+      const vh = VIEW.b - VIEW.t;
+      const zoom = 1 / vh;
+      camera.fov = clampFov(
+        THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(BASE_FOV / 2)) * zoom))
+      );
+      camera.aspect = rect.width / rect.height;
+      camera.setViewOffset(
+        rect.width,
+        rect.height,
+        -((VIEW.l + VIEW.r) / 2 - 0.5) * rect.width,
+        -((VIEW.t + VIEW.b) / 2 - 0.5) * rect.height,
+        rect.width,
+        rect.height
+      );
+      // Keep the long truck framed when the panel becomes narrow.
+      frameScale = Math.max(1, 1.55 / ((vw * rect.width) / (vh * rect.height)));
+      camera.updateProjectionMatrix();
+    }
+    resize();
+    new ResizeObserver(resize).observe(stage);
+
+    const startTime = performance.now();
+    let lastTime = startTime;
+
+    function animate() {
+      const now = performance.now();
+      const elapsed = (now - startTime) / 1000;
+      const dt = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime = now;
+
+      if (truckReady) {
+        if (!reduceMotion) {
+          truckPivot.position.y = 1.55 + Math.sin(elapsed * 0.72) * 0.085;
+          truckPivot.rotation.z = 0.025 + Math.sin(elapsed * 0.48) * 0.006;
+          truckPivot.rotation.y = baseYaw + Math.sin(elapsed * 0.22) * 0.008;
+          rings.rotation.y = elapsed * 0.035;
+          dust.rotation.y = elapsed * 0.018;
+          backGlow.material.opacity = 0.56 + Math.sin(elapsed * 0.9) * 0.06;
+
+          driftSpeedField(airField, dt, 0.85);
+          driftSpeedField(wheelField, dt, 1.05);
+
+          for (const rung of rungs) {
+            rung.position.z += 6.4 * dt;
+            if (rung.position.z > TRACK_SPAN / 2) rung.position.z -= TRACK_SPAN;
+            const rungEdge = Math.min(
+              rung.position.z + TRACK_SPAN / 2,
+              TRACK_SPAN / 2 - rung.position.z
+            );
+            rung.material.opacity = Math.max(0, Math.min(1, rungEdge / 2.6)) * 0.18;
+          }
+
+          for (const dash of dashes) {
+            dash.position.z += 6.4 * dt;
+            if (dash.position.z > TRACK_SPAN / 2) dash.position.z -= TRACK_SPAN;
+            const edge = Math.min(
+              dash.position.z + TRACK_SPAN / 2,
+              TRACK_SPAN / 2 - dash.position.z
+            );
+            dash.material.opacity = Math.max(0, Math.min(1, edge / 2.4)) * 0.85;
+          }
+
+          for (const fx of wheelFx) {
+            fx.wheel.getWorldPosition(wheelWorld);
+            const by = wheelWorld.y - 0.44;
+            fx.glow.position.set(wheelWorld.x, by, wheelWorld.z);
+            fx.glow.material.opacity = 0.3 + Math.sin(elapsed * 8 + fx.phase) * 0.08;
+            fx.smear.position.set(
+              wheelWorld.x + travelDir.x * 0.6,
+              by + 0.02,
+              wheelWorld.z + travelDir.z * 0.6
+            );
+            fx.smear.material.opacity = 0.26 + Math.sin(elapsed * 6.5 + fx.phase) * 0.09;
+          }
+
+          for (const sprite of windItems) {
+            sprite.position.z += sprite.userData.speed * dt;
+            if (sprite.position.z > 11) {
+              sprite.position.z -= 22;
+              sprite.position.x = (Math.random() - 0.5) * 9;
+            }
+          }
+
+          for (const tire of tireNodes) {
+            tire.rotation.x -= 9 * dt;
+          }
+
+          puffTimer -= dt;
+          if (puffTimer <= 0) {
+            spawnPuff();
+            if (rearWheels.length > 1) spawnPuff();
+            puffTimer = 0.06;
+          }
+          updatePuffs(dt);
+
+          const pos = dust.geometry.attributes.position;
+          for (let i = 0; i < dustCount; i++) {
+            pos.array[i * 3 + 1] += Math.sin(elapsed * 0.35 + dustSeed[i]) * 0.0014;
+          }
+          pos.needsUpdate = true;
+        }
+
+        parallaxX += (targetX - parallaxX) * Math.min(1, dt * 3.2);
+        parallaxY += (targetY - parallaxY) * Math.min(1, dt * 3.2);
+        camera.position.x = (baseCamera.x + parallaxX * 1.5) * frameScale;
+        camera.position.y = (baseCamera.y - parallaxY * 0.9) * frameScale;
+        camera.position.z = baseCamera.z * frameScale;
+        camera.lookAt(lookAt);
+      }
+
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

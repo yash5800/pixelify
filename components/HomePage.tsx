@@ -1,20 +1,23 @@
+'use client';
+
 // HomePage.tsx
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { useEffect } from 'react';
 import Footer from './Footer';
-import TruckScene from './TruckSceneClient';
 import type { ViewTab } from '../types';
-import Hero from "./Hero";
-import PixelifyStory from './PixelifyStory';
-import BGRemoverSection from './BGRemoverSection';
-import AIUpscalerSection from './AIUpscalerSection';
-import WhyChoosePixelify from './WhyChoosePixelify';
-import HomeFaq from './HomeFaq';
-import Testimonials from "./TestimonialsSection";
-import HomeDemo from './HomeDemo';
-import HomeWorkflowDemos from './HomeWorkflowDemos';
+import Hero from './Hero';
+import { CustomerLogos } from './home/CustomerLogos';
+import { StudioIntro } from './home/StudioIntro';
+import { WorkflowSection } from './home/WorkflowSection';
+import { PlatformBento } from './home/PlatformBento';
+import { ResultsGallery } from './home/ResultsGallery';
+import { TruckHero } from './home/TruckHero';
+import { ProofSection } from './home/ProofSection';
+import { StudioMarketplace } from './home/StudioMarketplace';
+import { FinalCta } from './home/FinalCta';
 import '@/styles/home.css';
-import { useTranslation } from '@/locales';
+import '@/styles/framer-home.css';
+import '@/styles/truck-hero.css';
+
 interface HomePageProps {
   onLaunchUpscaler: () => void;
   onLaunchBGRemove: () => void;
@@ -25,103 +28,41 @@ interface HomePageProps {
 export default function HomePage({
   onLaunchUpscaler,
   onLaunchBGRemove,
-  onSelectSample,
   onTabChange,
 }: HomePageProps) {
-  const { t } = useTranslation();
-  return (
-    <div className="relative min-h-screen bg-[#050507] text-white">
+  // Sections are client rendered, so the browser's own hash jump lands before
+  // the anchor exists. Re-run it once the page has painted.
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash) return;
 
-      {/* ========================================================================= */}
-      {/* HERO SECTION AT FULL VIEWPORT SCREEN WIDTH (100VW) */}
-      {/* ========================================================================= */}
+    const timer = window.setTimeout(() => {
+      const target = document.getElementById(decodeURIComponent(hash.slice(1)));
+      target?.scrollIntoView({ block: 'start' });
+    }, 400);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  return (
+    <div className="relative min-h-screen bg-[#090909] text-white fh-page">
       <Hero
         onLaunchUpscaler={onLaunchUpscaler}
         onLaunchBGRemove={onLaunchBGRemove}
       />
 
-      <div id="home-content" className="mx-auto flex w-full max-w-[1280px] flex-col gap-10 px-4 pb-12 pt-6 sm:gap-16 sm:px-6 sm:pt-12 lg:px-8 relative z-10">
-
-        <HomeWorkflowDemos onLaunchUpscaler={onLaunchUpscaler}
-          onLaunchBGRemove={onLaunchBGRemove}/>
-
-        {/* ========================================================================= */}
-        {/* DUAL POPPED WORKSPACE CARDS ("CHOOSE YOUR STUDIO" - reference.mp4 style) */}
-        {/* ========================================================================= */}
-        <section className="flex flex-col gap-8 sm:gap-10">
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center max-w-2xl mx-auto flex flex-col gap-3 px-2"
-          >
-            <span className="text-xs font-mono font-bold uppercase tracking-widest text-[#00FF85]">
-              {t.homeStudio.badge}
-            </span>
-            <h2 className="text-2xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight">
-              {t.homeStudio.title}
-            </h2>
-            <p className="text-xs sm:text-sm md:text-base text-neutral-400">
-              {t.homeStudio.subtitle}
-            </p>
-          </motion.div>
-
-          <div className="flex flex-col gap-0 relative">
-
-            {/* ROW 1: NEURAL BACKGROUND REMOVER WORKSTATION (REFERENCE UI) */}
-            <BGRemoverSection onLaunchBGRemove={onLaunchBGRemove} />
-
-            {/* ROW 2: AI UPSCALER STUDIO (REFERENCE UI WITH SPIDERMAN CARDS) */}
-            <AIUpscalerSection onLaunchUpscaler={onLaunchUpscaler} />
-
-            {/* ROW 3: WHY CHOOSE PIXELIFY (CURVED BACKGROUND LIKE BGREMOVER) */}
-
-            <WhyChoosePixelify />
-
-          </div>
-        </section>
-
-        {/* ========================================================================= */}
-        {/* PixelifyStory
-        {/* ========================================================================= */}
-
-
-        <PixelifyStory />
-
-
-        {/* ========================================================================= */}
-        {/* TESTIMONIALS SECTION (WHITE BG WITH ROUNDED CORNERS) */}
-        {/* ========================================================================= */}
-
-        <Testimonials />
-
-        {/* ========================================================================= */}
-        {/* INSTANT DEMOS GRID */}
-        {/* ========================================================================= */}
-        <HomeDemo onSelectSample={onSelectSample} />
-
+      <div id="home-content" className="relative z-10">
+        <CustomerLogos />
+        <StudioIntro />
+        <WorkflowSection />
+        <PlatformBento />
+        <ResultsGallery />
+        <TruckHero />
+        <ProofSection />
+        <StudioMarketplace />
+        <FinalCta />
       </div>
 
-      {/* ========================================================================= */}
-      {/* FAQ (SAME WIDTH AND STYLE AS UPSCALER AND BG REMOVER) */}
-      {/* ========================================================================= */}
-      <HomeFaq />
-
-      {/* ========================================================================= */}
-      {/* 3D TRUCK SCENE AT FULL DEVICE VIEWPORT WIDTH (EDGE-TO-EDGE) */}
-      {/* ========================================================================= */}
-      <motion.section
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.8 }}
-        className="relative w-full overflow-hidden my-4 sm:my-8"
-      >
-        <TruckScene />
-      </motion.section>
-
-      {/* FOOTER */}
       <Footer onTabChange={onTabChange} />
     </div>
   );
