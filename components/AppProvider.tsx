@@ -28,13 +28,17 @@ import type {
   UpscaleItem,
   ModelDownloadItem,
 } from '../types';
-import { makeId } from '../lib/bgUtils';
+import { makeId, formatBytes } from '../lib/bgUtils';
 import { useLiteRT } from '../hooks/useLiteRT';
-import { isUpscalerModelCached } from '../utils/upscale';
 import { useUpscale, cancelUpscale } from '../hooks/useUpscale';
 import { bgRemoverService } from '../services/bgRemoverService';
 import { clearDownloadedModelCaches, requestPersistentModelStorage, subscribeToModelCacheCleared } from '../utils/modelCache';
 import { buildPresetOptions, getDefaultPreset, MAX_OUTPUT_DIM, MODELS } from '../lib/constants';
+import {
+  checkUpscaleBudget,
+  formatPixels,
+  MAX_SOURCE_PIXELS,
+} from '../utils/memoryBudget';
 import {
   playSuccessChime,
   primeAudio,
@@ -527,12 +531,17 @@ export default function AppProvider({ children }: { children: React.ReactNode })
     }
     void requestPersistentModelStorage();
 
+    const routeSegments = pathname?.split('/').filter(Boolean) ?? [];
+    const pageSegments = routeSegments.length > 0 && SITE_LANGUAGES.some((l) => l.code === routeSegments[0])
+      ? routeSegments.slice(1)
+      : routeSegments;
+    const isUpscalerRoute = pageSegments.join('/') === 'upscaler';
+    const isBgPage = pageSegments.join('/') === 'bg_remove';
+    const isHomeRoute = pageSegments.length === 0;
+
     const preloadModels = async () => {
       try {
         if (cancelled || preloadCancelledRef.current) return;
-
-        const isBgPage = pathname?.startsWith('/bg_remove');
-        const isUpscalerPage = pathname?.startsWith('/upscaler');
 
         if (isBgPage) {
           // On background removal route: ONLY pre-warm background remover service
@@ -540,12 +549,13 @@ export default function AppProvider({ children }: { children: React.ReactNode })
           return;
         }
 
-        if (isUpscalerPage) {
-          // On upscaler route: ONLY pre-warm LiteRT upscaler
-          let vitalityCached = false;
-          try { vitalityCached = await isUpscalerModelCached('vitality'); } catch { vitalityCached = false; }
-
-          if (!vitalityCached && !cancelled && !preloadCancelledRef.current) {
+        if (isUpscalerRoute || isHomeRoute) {
+          // Warm only the lightweight default upscaler on Home and its own
+          // route. This gives the session time to compile before an image is
+          // selected without starting the much larger BG-removal download.
+          // A cached model file still needs a fresh in-memory session after a
+          // page load; silentIfCached only suppresses transfer percentages.
+          if (!cancelled && !preloadCancelledRef.current) {
             await initLiteRT();
             if (cancelled || preloadCancelledRef.current) return;
 
@@ -556,21 +566,12 @@ export default function AppProvider({ children }: { children: React.ReactNode })
           return;
         }
 
-        // On landing page or general navigation: Sequential preload to avoid network congestion
-        await bgRemoverService.init();
-        if (cancelled || preloadCancelledRef.current) return;
-
-        let vitalityCached = false;
-        try { vitalityCached = await isUpscalerModelCached('vitality'); } catch { vitalityCached = false; }
-
-        if (!vitalityCached && !cancelled && !preloadCancelledRef.current) {
-          await initLiteRT();
-          if (cancelled || preloadCancelledRef.current) return;
-
-          setActiveUpscalerModel('vitality');
-          const ok = await loadModel('vitality', { silentIfCached: true, background: true });
-          if (!cancelled) setUpscalerPreloadError(!ok);
-        }
+        // Landing / general pages run no AI. Warming BOTH stacks there used to
+        // cost several hundred MB of resident memory (two WASM runtimes + the
+        // Chopper pipeline) on a page that only shows static demos. Intent is
+        // still covered: hovering a CTA warms via warmup(), and each tool route
+        // preloads its own stack on mount.
+        return;
       } catch (err) {
         if (!cancelled) {
           setUpscalerPreloadError(true);
@@ -587,10 +588,15 @@ export default function AppProvider({ children }: { children: React.ReactNode })
       | ((callback: () => void, options?: { timeout: number }) => number)
       | undefined;
     const cancelIdleCallback = (window as any).cancelIdleCallback as ((id: number) => void) | undefined;
-    const idleId = requestIdleCallback
+    // Begin on the upscaler route immediately; warm Home in idle time so the
+    // user can move to the tool and pick an image while LiteRT compiles.
+    const idleId = !isUpscalerRoute && isHomeRoute && requestIdleCallback
       ? requestIdleCallback(() => { void preloadModels(); }, { timeout: 1800 })
       : null;
-    const timerId = idleId === null ? window.setTimeout(() => { void preloadModels(); }, 900) : null;
+    const timerId = isHomeRoute && idleId === null
+      ? window.setTimeout(() => { void preloadModels(); }, 900)
+      : null;
+    if (isUpscalerRoute) void preloadModels();
 
     return () => {
       cancelled = true;
@@ -635,11 +641,9 @@ export default function AppProvider({ children }: { children: React.ReactNode })
 
   /* ----------------------------------------------------------
      MODEL WARMUP (hover-intent preloading)
-       The idle preload covers most visits, but a user hovering a
-       CTA before that fires gets the runtime + model moving right
-       away instead of on click. Fully idempotent: init/load paths
-       guard themselves, and failures stay silent here (the click
-       path surfaces real errors).
+       Upscaler assets are small enough to warm on intent. The BG
+       remover model is large (~192 MB) and loads when its route is
+       opened, so a transient hover must not start that download.
        ---------------------------------------------------------- */
   const warmup = useCallback(
     (tab: ViewTab) => {
@@ -655,8 +659,6 @@ export default function AppProvider({ children }: { children: React.ReactNode })
               } catch { /* silent: click path handles errors */ }
             })();
           }
-        } else if (tab === 'bg_remove') {
-          void bgRemoverService.init();
         }
       } catch { /* silent */ }
     },
@@ -690,9 +692,21 @@ export default function AppProvider({ children }: { children: React.ReactNode })
   /* ----------------------------------------------------------
      ADD UPSCALE FILE (Creates individual UpscaleItem)
      ---------------------------------------------------------- */
+  /** Drop the object URLs and decoded bitmap owned by an upscale item. */
+  const releaseUpscaleItem = useCallback((item: UpscaleItem) => {
+    cancelUpscale(item.id);
+    if (item.result?.blobUrl) URL.revokeObjectURL(item.result.blobUrl);
+    if (item.url?.startsWith('blob:')) URL.revokeObjectURL(item.url);
+    if (item.img && item.status !== 'processing') {
+      item.img.onload = null;
+      item.img.onerror = null;
+      item.img.src = '';
+    }
+  }, []);
+
   const addUpscaleFile = useCallback((file: File, autoProcess = false) => {
     if (file.size > MAX_UPSCALER_FILE_SIZE) {
-      addToast('error', 'Please choose an image under 15 MB.');
+      addToast('error', 'Selected file exceeds the 15 MB limit.');
       return;
     }
     const url = URL.createObjectURL(file);
@@ -700,14 +714,46 @@ export default function AppProvider({ children }: { children: React.ReactNode })
     img.onload = () => {
       const width = img.naturalWidth || img.width;
       const height = img.naturalHeight || img.height;
-      if (width * DEFAULT_OPTIONS.scale > MAX_OUTPUT_DIM || height * DEFAULT_OPTIONS.scale > MAX_OUTPUT_DIM) {
-        const supports2x = width * 2 <= MAX_OUTPUT_DIM && height * 2 <= MAX_OUTPUT_DIM;
+
+      // Admission is by file size (15 MB above) and source megapixels. 32 MP is
+      // the largest source this pipeline accepts; a 15 MB photo can easily be
+      // over that, and no amount of compression makes the pixels cheaper.
+      if (width * height > MAX_SOURCE_PIXELS) {
+        img.onload = null;
+        img.onerror = null;
+        URL.revokeObjectURL(url);
+        img.src = '';
         addToast(
-          'info',
-          supports2x
-            ? `Image too large for 4x/8x. Select 2x to stay within the limit.`
-            : `Choose 2x to stay under the limit.`
+          'error',
+          `Image resolution (${formatPixels(width * height)}, ${width}×${height}) exceeds the 32 MP source limit.`
         );
+        return;
+      }
+
+      // Pick the largest scale this image fits in on this device. 4× turns a
+      // 12 MP photo into ~192 MP, which exceeds the tab's memory budget, so
+      // fall back to 2× instead of starting a run that is guaranteed to fail
+      // (or take the tab down with an OOM).
+      const options = { ...DEFAULT_OPTIONS };
+      const budget = checkUpscaleBudget(width, height, options.scale);
+      if (!budget.ok) {
+        if (budget.suggestedScale) {
+          options.scale = budget.suggestedScale;
+          addToast(
+            'info',
+            `${width}×${height} at ${DEFAULT_OPTIONS.scale}× exceeds the output limit (${formatPixels(budget.pixels)}). Switched to ${budget.suggestedScale}×.`
+          );
+        } else {
+          img.onload = null;
+          img.onerror = null;
+          URL.revokeObjectURL(url);
+          img.src = '';
+          addToast(
+            'error',
+            `Image (${width}×${height}) exceeds this device's processing capacity. Select a smaller image.`
+          );
+          return;
+        }
       }
       const newItemId = makeId();
       const newItem: UpscaleItem = {
@@ -723,7 +769,7 @@ export default function AppProvider({ children }: { children: React.ReactNode })
         progress: { percent: 0, text: '' },
         result: null,
         error: null,
-        options: { ...DEFAULT_OPTIONS },
+        options,
         modelKey: 'vitality',
       };
       setItems((prev) => [...prev, newItem]);
@@ -737,7 +783,11 @@ export default function AppProvider({ children }: { children: React.ReactNode })
       scrollToTop();
     };
     img.onerror = () => {
-      addToast('error', 'Failed to load image file.');
+      img.onload = null;
+      img.onerror = null;
+      URL.revokeObjectURL(url);
+      img.src = '';
+      addToast('error', 'Unable to load the selected image.');
     };
     img.src = url;
   }, [addToast, loadModel, scrollToTop]);
@@ -747,6 +797,8 @@ export default function AppProvider({ children }: { children: React.ReactNode })
      ---------------------------------------------------------- */
   const handleItemModelChange = useCallback(
     async (id: string, key: ModelKey) => {
+      const previous = items.find((i) => i.id === id);
+      if (previous?.result?.blobUrl) URL.revokeObjectURL(previous.result.blobUrl);
       setItems((prev) =>
         prev.map((i) =>
           i.id === id
@@ -774,7 +826,7 @@ export default function AppProvider({ children }: { children: React.ReactNode })
         addToast('error', `Failed to load ${MODELS[key]?.name || key} model.`);
       }
     },
-    [loadModel, addToast]
+    [items, loadModel, addToast]
   );
 
   /* ----------------------------------------------------------
@@ -812,15 +864,13 @@ export default function AppProvider({ children }: { children: React.ReactNode })
       const item = items.find((i) => i.id === id);
       if (!item || item.status === 'processing') return;
 
-      const outputWidth = Math.round(item.width * item.options.scale);
-      const outputHeight = Math.round(item.height * item.options.scale);
-      if (outputWidth > MAX_OUTPUT_DIM || outputHeight > MAX_OUTPUT_DIM) {
-        const supports2x = item.width * 2 <= MAX_OUTPUT_DIM && item.height * 2 <= MAX_OUTPUT_DIM;
+      const budget = checkUpscaleBudget(item.width, item.height, item.options.scale);
+      if (!budget.ok) {
         addToast(
           'info',
-          supports2x
-            ? `Image too large for 4x/8x. Select 2x to stay within the limit.`
-            : `Choose 2x to stay under the limit.`
+          budget.suggestedScale
+            ? `Output at ${item.options.scale}× would be ${formatPixels(budget.pixels)}. Select ${budget.suggestedScale}× to fit this device's limit.`
+            : 'This image exceeds the output limit for this device. Select a smaller image.'
         );
         setItems((prev) => prev.map((entry) => entry.id === id
           ? { ...entry, status: 'idle', error: null, progress: { percent: 0, text: '' } }
@@ -828,6 +878,7 @@ export default function AppProvider({ children }: { children: React.ReactNode })
         return;
       }
       const operationId = window.crypto.randomUUID();
+      let lastProgressAt = 0;
 
       // Prime audio context and ask for browser notification permission on user gesture
       primeAudio();
@@ -865,6 +916,12 @@ export default function AppProvider({ children }: { children: React.ReactNode })
           item.modelKey,
           item.options,
           (p: ProgressState) => {
+            // Progress is decorative: it must never compete with typing, hover
+            // or scrolling for the main thread, and it re-renders the whole
+            // provider tree. Coalesce bursts and mark the update interruptible.
+            const now = performance.now();
+            if (p.percent < 100 && now - lastProgressAt < 150) return;
+            lastProgressAt = now;
             setItems((prev) =>
               prev.map((i) => (i.id === id ? { ...i, progress: p } : i))
             );
@@ -905,7 +962,7 @@ export default function AppProvider({ children }: { children: React.ReactNode })
         );
         addToast(
           'success',
-          `✨ ${item.name} upscaled successfully! (${item.options.scale}×, ${(res.time / 1000).toFixed(1)}s)`
+          `Upscale complete: ${item.name} (${item.options.scale}×, ${(res.time / 1000).toFixed(1)}s).`
         );
       } catch (err: any) {
         // A user cancel was already handled by handleCancelUpscale (item is idle).
@@ -916,15 +973,15 @@ export default function AppProvider({ children }: { children: React.ReactNode })
         if (isOutputLimit) {
           const supports2x = item.width * 2 <= MAX_OUTPUT_DIM && item.height * 2 <= MAX_OUTPUT_DIM;
           addToast('info', supports2x
-            ? `This image is too large for ${item.options.scale}×. Choose 2× to stay within the output limit.`
-            : 'This image is too large for the supported output limit. Use a smaller source image.');
+            ? `Output at ${item.options.scale}× exceeds the limit for this image. Try 2× instead.`
+            : 'This image exceeds the supported output limit. Select a smaller image.');
           setItems((prev) => prev.map((entry) => entry.id === id
             ? { ...entry, status: 'idle', error: null, progress: { percent: 0, text: '' } }
             : entry));
           return;
         }
         console.error(`Upscaling failed for ${item.name}:`, err);
-        const userMessage = 'Could not upscale this image. Please retry, or choose a smaller image if the problem continues.';
+        const userMessage = 'Upscaling failed. Try again, or use a smaller image.';
         setItems((prev) =>
           prev.map((i) =>
             i.id === id
@@ -959,6 +1016,8 @@ export default function AppProvider({ children }: { children: React.ReactNode })
      ---------------------------------------------------------- */
   const handleCancelUpscale = useCallback((id: string) => {
     cancelUpscale(id);
+    const item = items.find((i) => i.id === id);
+    if (item?.result?.blobUrl) URL.revokeObjectURL(item.result.blobUrl);
     setItems((prev) =>
       prev.map((i) =>
         i.id === id
@@ -972,8 +1031,8 @@ export default function AppProvider({ children }: { children: React.ReactNode })
           : i
       )
     );
-    addToast('info', 'Enhancement cancelled.');
-  }, [addToast]);
+    addToast('info', 'Upscaling cancelled.');
+  }, [items, addToast]);
 
   /* ----------------------------------------------------------
      REMOVE / CLEAR ITEMS
@@ -981,7 +1040,7 @@ export default function AppProvider({ children }: { children: React.ReactNode })
   const handleRemoveItem = useCallback(
     (id: string) => {
       const removed = items.find((i) => i.id === id);
-      if (removed?.result?.blobUrl) URL.revokeObjectURL(removed.result.blobUrl);
+      if (removed) releaseUpscaleItem(removed);
       setItems((prev) => {
         const next = prev.filter((i) => i.id !== id);
         if (next.length === 0) {
@@ -993,17 +1052,15 @@ export default function AppProvider({ children }: { children: React.ReactNode })
         return next;
       });
     },
-    [selectedId]
+    [items, selectedId, releaseUpscaleItem]
   );
 
   const handleClearAll = useCallback(() => {
-    for (const item of items) {
-      if (item.result?.blobUrl) URL.revokeObjectURL(item.result.blobUrl);
-    }
+    for (const item of items) releaseUpscaleItem(item);
     setItems([]);
     setSelectedId(null);
     setStep('upload');
-  }, [items]);
+  }, [items, releaseUpscaleItem]);
 
   /* ----------------------------------------------------------
      EXIT WORKSPACE (mobile X / desktop close) - back to upload.
@@ -1025,7 +1082,7 @@ export default function AppProvider({ children }: { children: React.ReactNode })
      DOWNLOAD RESULT (Per image)
      ---------------------------------------------------------- */
   const handleDownloadItem = useCallback(
-    async (id: string, format: 'png' | 'webp' | 'jpeg' = 'png') => {
+    async (id: string, format: 'png' | 'webp' | 'jpeg' = 'webp') => {
       const item = items.find((i) => i.id === id);
       const res = item?.result;
       const resultUrl = res?.blobUrl;
@@ -1037,36 +1094,70 @@ export default function AppProvider({ children }: { children: React.ReactNode })
         const a = document.createElement('a');
         a.href = url;
         a.download = `${baseName}_upscaled_${item.options.scale}x.${ext}`;
+        a.rel = 'noopener';
+        document.body.appendChild(a);
         a.click();
+        a.remove();
       };
 
       if (format === 'png') {
         triggerDownload(resultUrl);
+        addToast(
+          'success',
+          res.bytes ? `Exported PNG (${formatBytes(res.bytes)}).` : 'Exported PNG.'
+        );
         return;
       }
 
+      // The stored master is a lossless PNG, which costs roughly one byte per
+      // pixel — a 48 MP upscale is ~50 MB. Re-encode photos to WebP/JPEG on
+      // download: 6-8x smaller with no visible difference at these qualities.
       try {
-        const blob = await (await fetch(resultUrl)).blob();
-        const bitmap = await createImageBitmap(blob);
+        const sourceBlob = await (await fetch(resultUrl)).blob();
+        const bitmap = await createImageBitmap(sourceBlob);
         const canvas = document.createElement('canvas');
         canvas.width = res.width;
         canvas.height = res.height;
-        const ctx = canvas.getContext('2d')!;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Canvas 2D context is unavailable.');
+
+        // JPEG has no alpha channel. Flatten onto white so edges that were
+        // transparent in the PNG do not turn black.
+        if (format === 'jpeg') {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, res.width, res.height);
+        }
         ctx.drawImage(bitmap, 0, 0, res.width, res.height);
         bitmap.close?.();
-        canvas.toBlob(
-          (out) => {
-            if (!out) return;
-            const url = URL.createObjectURL(out);
-            triggerDownload(url);
-            URL.revokeObjectURL(url);
-          },
-          format === 'webp' ? 'image/webp' : 'image/jpeg',
-          0.95,
+
+        const mime = format === 'webp' ? 'image/webp' : 'image/jpeg';
+        const quality = format === 'webp' ? 0.93 : 0.92;
+        const out = await new Promise<Blob | null>((resolve) =>
+          canvas.toBlob(resolve, mime, quality)
+        );
+        canvas.width = 0;
+        canvas.height = 0;
+        if (!out) throw new Error('Encoding failed.');
+
+        // Browsers without a WebP encoder silently return a PNG blob. Honour
+        // the real type so the file extension never lies about the contents.
+        if (out.type !== mime) {
+          addToast('info', `${format.toUpperCase()} encoding is unavailable in this browser. Exported PNG instead.`);
+          triggerDownload(resultUrl);
+          return;
+        }
+
+        const url = URL.createObjectURL(out);
+        triggerDownload(url);
+        // Revoking immediately can cancel the download in some browsers.
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        addToast(
+          'success',
+          `Exported ${ext.toUpperCase()} (${formatBytes(out.size)}).`
         );
       } catch (err) {
         console.warn(`Re-encoding to ${format.toUpperCase()} failed; saving PNG instead.`, err);
-        addToast('error', `Could not export as ${format.toUpperCase()}; saved the PNG instead.`);
+        addToast('error', `Unable to export as ${format.toUpperCase()}. Exported PNG instead.`);
         triggerDownload(resultUrl);
       }
     },
@@ -1078,11 +1169,11 @@ export default function AppProvider({ children }: { children: React.ReactNode })
     const files = Array.from(fileList);
     const valid = files.filter((f) => f.type.startsWith('image/') && f.size <= MAX_BG_FILE_SIZE);
     if (!valid.length) {
-      addToast('error', 'Please choose images under 20 MB.');
+      addToast('error', 'Selected files exceed the 20 MB limit.');
       return;
     }
     if (valid.length < files.length) {
-      addToast('error', 'Some images exceeded the 20 MB limit and were skipped.');
+      addToast('error', 'Some files exceeded the 20 MB limit and were skipped.');
     }
     const additions: BGJob[] = valid.map((file) => ({
       id: makeId(),
@@ -1098,7 +1189,7 @@ export default function AppProvider({ children }: { children: React.ReactNode })
     setBgJobs((prev) => [...prev, ...additions]);
     navigateTo('bg_remove');
     if (showToast) {
-      addToast('success', `${additions.length} image(s) added to Cutout Canvas.`);
+      addToast('success', `Added ${additions.length} image${additions.length === 1 ? '' : 's'} to Cutout Canvas.`);
     }
   }, [addToast, navigateTo]);
 
@@ -1114,7 +1205,7 @@ export default function AppProvider({ children }: { children: React.ReactNode })
       handleBGFiles([file]);
       scrollToTop();
     } catch {
-      addToast('error', 'Could not load sample.');
+      addToast('error', 'Unable to load the sample image.');
     } finally {
       setTimeout(() => {
         isSelectingSampleRef.current = false;
@@ -1139,17 +1230,17 @@ export default function AppProvider({ children }: { children: React.ReactNode })
         navigateTo('upscaler');
         addUpscaleFile(file, true);
         setTimeout(() => {
-          addToast('success', `${rawName} added to AI Upscaler.`);
+          addToast('success', `Added to AI Upscaler: ${rawName}.`);
         }, 350);
       } else {
         navigateTo('bg_remove');
         handleBGFiles([file], false);
         setTimeout(() => {
-          addToast('success', `${rawName} added to Cutout Canvas.`);
+          addToast('success', `Added to Cutout Canvas: ${rawName}.`);
         }, 350);
       }
     } catch (err) {
-      addToast('error', 'Could not load sample.');
+      addToast('error', 'Unable to load the sample image.');
       throw err;
     } finally {
       setTimeout(() => {

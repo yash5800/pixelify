@@ -53,6 +53,7 @@ async function loadTransformers(preferredUrl?: string): Promise<void> {
             if (cached) {
               const ab = await cached.arrayBuffer();
               if (ab && ab.byteLength > 100_000) {
+                reportWebGpuAssetsReady();
                 console.log(`[Pixelify BG] Loaded Chopper model from ${isHf ? 'Hugging Face' : 'public/models'} (Browser Cache): ${(ab.byteLength / (1024 * 1024)).toFixed(1)} MB`);
                 return new Response(ab, {
                   status: 200,
@@ -156,6 +157,7 @@ async function loadTransformers(preferredUrl?: string): Promise<void> {
               }
             }
 
+            reportWebGpuAssetsReady();
             post({
               type: 'PROGRESS',
               stage: 'model-download',
@@ -189,7 +191,9 @@ async function loadTransformers(preferredUrl?: string): Promise<void> {
       if (onnxEnv?.wasm) {
         const cores = (self.navigator as any)?.hardwareConcurrency ?? 4;
         const isolated = (self as any).crossOriginIsolated === true;
-        onnxEnv.wasm.numThreads = isolated ? Math.min(4, cores) : 1;
+        // Leave one core for the page thread. Using every core makes the UI
+        // (React renders + scrolling) stutter while inference runs.
+        onnxEnv.wasm.numThreads = isolated ? Math.max(1, Math.min(3, cores - 1)) : 1;
       }
     })();
   }
@@ -204,6 +208,7 @@ type WorkerMessage = {
   url?: string;
   model?: BgModelKey;
   forceWasm?: boolean;
+  knownWebgpuFailure?: string;
   /** Same-origin blob URL for the transformers.js runtime (main-thread cache). */
   runtimeUrl?: string;
   /** Optional custom model URL from env (e.g. Hugging Face resolve URL for Chopper). */
@@ -214,6 +219,7 @@ type WorkerMessage = {
 
 const MODEL_ID = 'studioludens/birefnet-lite-512';
 const GPU_PROBE_TIMEOUT_MS = 3500;
+const WEBGPU_MODEL_INIT_TIMEOUT_MS = 8000;
 
 /* ============================================================
    DIABLO - Studio ultra-precision matting network.
@@ -291,8 +297,16 @@ let removerPromise: Promise<any> | null = null;
 let chosenEngine: Engine | null = null;
 let preferredEngine: Engine | null = null;
 let webgpuAvailable = false;
+/** True when the probe adapter exposes shader-f16, i.e. fp16 weights will run fast. */
+let webgpuSupportsF16 = false;
 let lastWebgpuError: string | null = null;
 let initStartedAt = 0;
+let markWebGpuAssetsReady: (() => void) | null = null;
+let knownWebgpuFailureReason: string | null = null;
+
+function reportWebGpuAssetsReady(): void {
+  markWebGpuAssetsReady?.();
+}
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -313,6 +327,7 @@ function progressCallback(event: any) {
     // Transformers.js downloads several config files (<1MB) and the actual model weights (>5MB or .onnx)
     const isWeights = file.endsWith('.onnx') || total > 5 * 1024 * 1024;
     const progress = total > 0 ? Math.max(0, Math.min(100, Math.round((loaded / total) * 100))) : null;
+    if (isWeights && progress === 100) reportWebGpuAssetsReady();
     post({
       type: 'PROGRESS',
       stage: 'model-download',
@@ -324,6 +339,9 @@ function progressCallback(event: any) {
       model: 'chopper',
     });
   } else if (event?.status) {
+    if (event.status === 'done' && String(event.file || '').endsWith('.onnx')) {
+      reportWebGpuAssetsReady();
+    }
     post({ type: 'STATUS', stage: String(event.status), detail: event.file, model: 'chopper' });
   }
 }
@@ -351,6 +369,11 @@ async function detectWebGPU(timeoutMs = GPU_PROBE_TIMEOUT_MS): Promise<boolean> 
       if (adapterTimeoutId !== undefined) clearTimeout(adapterTimeoutId);
     }
     if (!adapter) return false;
+    try {
+      webgpuSupportsF16 = typeof adapter.features?.has === 'function' && adapter.features.has('shader-f16');
+    } catch {
+      webgpuSupportsF16 = false;
+    }
 
     let timedOut = false;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -384,11 +407,59 @@ async function createPipeline(engine: Engine): Promise<any> {
   await loadTransformers(runtimeUrlOverride);
   const activeModel = modelUrlOverride ? 'Chopper (Custom Hugging Face)' : MODEL_ID;
   postStatus('loading-model', { requestedEngine: engine, model: activeModel });
+  // fp16 is the single biggest inference win for the default model: half the
+  // weights to fetch, half the VRAM, and roughly 2x the matmul throughput on
+  // GPUs with shader-f16. Custom weight URLs are always fp32, and CPU/WASM has
+  // no fast fp16 path, so those keep fp32.
+  const dtype = engine === 'webgpu' && !modelUrlOverride && webgpuSupportsF16 ? 'fp16' : 'fp32';
   return pipeline!('background-removal', MODEL_ID, {
     device: engine,
-    dtype: 'fp32',
+    dtype,
     progress_callback: progressCallback,
   } as any);
+}
+
+/**
+ * Bound only WebGPU model compilation. The timer starts after the weight file
+ * is available, so a slow first download does not trigger the CPU fallback.
+ */
+async function createWebGpuPipelineWithTimeout(): Promise<any> {
+  let resolveAssetsReady!: () => void;
+  const assetsReady = new Promise<void>((resolve) => { resolveAssetsReady = resolve; });
+  let assetsReadyReported = false;
+  markWebGpuAssetsReady = () => {
+    if (assetsReadyReported) return;
+    assetsReadyReported = true;
+    resolveAssetsReady();
+  };
+
+  let timedOut = false;
+  let settled = false;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const pipelinePromise = createPipeline('webgpu');
+  const timeoutPromise = assetsReady.then(() => new Promise<never>((_, reject) => {
+    if (settled) return;
+    timeoutId = setTimeout(() => {
+      timedOut = true;
+      const error = new Error(`WebGPU model initialization exceeded ${WEBGPU_MODEL_INIT_TIMEOUT_MS}ms after model assets were ready.`);
+      (error as any).webgpuInitTimeout = true;
+      reject(error);
+    }, WEBGPU_MODEL_INIT_TIMEOUT_MS);
+  }));
+
+  // A timed-out pipeline may still resolve later. Release it instead of
+  // keeping an abandoned GPU session resident alongside the WASM fallback.
+  void pipelinePromise.then((remover) => {
+    if (timedOut) void disposePipeline(remover);
+  }).catch(() => undefined);
+
+  try {
+    return await Promise.race([pipelinePromise, timeoutPromise]);
+  } finally {
+    settled = true;
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+    markWebGpuAssetsReady = null;
+  }
 }
 
 /** Best-effort release. Transformers.js versions differ in which object exposes dispose(). */
@@ -449,20 +520,25 @@ async function disposeChopper(): Promise<void> {
 async function createResilientPipeline(preferred: Engine): Promise<any> {
   if (preferred === 'webgpu') {
     postStatus('initializing-webgpu', { requestedEngine: 'webgpu' });
+    const initAt = performance.now();
     try {
-      const remover = await createPipeline('webgpu');
+      const remover = await createWebGpuPipelineWithTimeout();
       chosenEngine = 'webgpu';
       lastWebgpuError = null;
+      console.info(`[Pixelify BG Worker] Chopper WebGPU model initialization: ${Math.round(performance.now() - initAt)}ms`);
       postStatus('ready', { engine: 'webgpu' });
       return remover;
     } catch (error) {
       lastWebgpuError = errorMessage(error);
+      console.info(`[Pixelify BG Worker] Chopper WebGPU initialization failed after ${Math.round(performance.now() - initAt)}ms; using WASM.`, lastWebgpuError);
       post({
         type: 'ENGINE_FALLBACK',
         from: 'webgpu',
         to: 'wasm',
         stage: 'initialization',
         reason: lastWebgpuError,
+        model: 'chopper',
+        workerRestartRequired: (error as any)?.webgpuInitTimeout === true,
       });
       postStatus('initializing-wasm', { reason: lastWebgpuError });
     }
@@ -489,7 +565,11 @@ async function getRemover(forceWasm = false): Promise<any> {
   if (!removerPromise) {
     const promise = (async () => {
       const isMobile = isMobileDevice();
-      const hasWebGpu = await detectWebGPU();
+      const probeStartedAt = performance.now();
+      const hasWebGpu = forceWasm
+        ? !!knownWebgpuFailureReason
+        : await detectWebGPU();
+      console.info(`[Pixelify BG Worker] Chopper WebGPU preflight: ${Math.round(performance.now() - probeStartedAt)}ms, available=${hasWebGpu}`);
       webgpuAvailable = hasWebGpu;
 
       // Mobile devices enforce WASM (Standard CPU) to prevent uncatchable tab crashes/OOM
@@ -499,7 +579,7 @@ async function getRemover(forceWasm = false): Promise<any> {
       preferredEngine = engine;
       const fallbackReason = isMobile && hasWebGpu
         ? 'Mobile device detected: using Standard (CPU) mode to prevent browser memory crashes.'
-        : undefined;
+        : forceWasm ? knownWebgpuFailureReason || undefined : undefined;
 
       post({
         type: 'CAPABILITIES',
@@ -507,6 +587,7 @@ async function getRemover(forceWasm = false): Promise<any> {
         webgpuAvailable,
         forceWasm,
         isMobile,
+        model: 'chopper',
         reason: fallbackReason,
       });
       return createResilientPipeline(engine);
@@ -529,8 +610,8 @@ async function getRemover(forceWasm = false): Promise<any> {
  * reset, memory pressure), replace the pipeline with WASM and retry this image
  * exactly once. WASM errors are surfaced rather than retried forever.
  */
-async function runInference(inputBlob: Blob): Promise<any> {
-  const remover = await getRemover();
+async function runInference(inputBlob: Blob, forceWasm = false): Promise<any> {
+  const remover = await getRemover(forceWasm);
   if (chosenEngine === 'webgpu') webgpuTouched = true;
   try {
     return await remover(inputBlob);
@@ -544,6 +625,7 @@ async function runInference(inputBlob: Blob): Promise<any> {
       to: 'wasm',
       stage: 'inference',
       reason: lastWebgpuError,
+      model: 'chopper',
     });
     postStatus('recovering-with-wasm', { reason: lastWebgpuError });
 
@@ -594,7 +676,7 @@ async function loadOrtRuntime(): Promise<any> {
         };
         const cores = (self.navigator as any)?.hardwareConcurrency ?? 4;
         const isolated = (self as any).crossOriginIsolated === true;
-        mod.env.wasm.numThreads = isolated ? Math.min(4, cores) : 1;
+        mod.env.wasm.numThreads = isolated ? Math.max(1, Math.min(3, cores - 1)) : 1;
         mod.env.logLevel = 'warning';
       }
       if (!mod?.InferenceSession?.create) {
@@ -701,7 +783,10 @@ async function getDiabloModelSource(): Promise<DiabloModelSource> {
     file: 'Diablo.onnx',
   });
 
-  let downloadedBlob: Blob;
+  // Assemble straight into one Uint8Array. The previous chunks → Blob →
+  // arrayBuffer() chain held ~3 full copies of the 222 MB file in the worker
+  // heap at once, which alone can push a phone into swap.
+  let downloadedBytes: Uint8Array;
   if (response.body && typeof response.body.getReader === 'function') {
     const reader = response.body.getReader();
     const chunks: Uint8Array[] = [];
@@ -732,23 +817,29 @@ async function getDiabloModelSource(): Promise<DiabloModelSource> {
         }
       }
     }
-    downloadedBlob = new Blob(chunks as any, { type: 'application/octet-stream' });
+    downloadedBytes = new Uint8Array(received);
+    let offset = 0;
+    for (const chunk of chunks) {
+      downloadedBytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    chunks.length = 0;
   } else {
-    downloadedBlob = await response.blob();
+    downloadedBytes = new Uint8Array(await response.arrayBuffer());
   }
 
-  if (!downloadedBlob || downloadedBlob.size === 0) {
+  if (!downloadedBytes || downloadedBytes.byteLength === 0) {
     throw new Error('Diablo weights are empty or could not be read.');
   }
 
-  console.log(`[Diablo Model] ✅ Diablo weights download completed: ${(downloadedBlob.size / (1024 * 1024)).toFixed(2)} MB`);
+  console.log(`[Diablo Model] ✅ Diablo weights download completed: ${(downloadedBytes.byteLength / (1024 * 1024)).toFixed(2)} MB`);
 
   post({
     type: 'PROGRESS',
     stage: 'model-download',
     progress: 100,
-    loaded: downloadedBlob.size,
-    total: downloadedBlob.size,
+    loaded: downloadedBytes.byteLength,
+    total: downloadedBytes.byteLength,
     isWeights: true,
     model: 'diablo',
     file: 'Diablo.onnx',
@@ -757,24 +848,16 @@ async function getDiabloModelSource(): Promise<DiabloModelSource> {
   if (typeof caches !== 'undefined') {
     try {
       const cache = await caches.open(DIABLO_MODEL_CACHE);
-      const headers = { 'content-type': 'application/octet-stream', 'content-length': String(downloadedBlob.size) };
-      await cache.put(cacheUrl, new Response(downloadedBlob.slice(0), { status: 200, headers }));
-      if (cacheUrl !== DEFAULT_DIABLO_MODEL_URL) {
-        await cache.put(DEFAULT_DIABLO_MODEL_URL, new Response(downloadedBlob.slice(0), { status: 200, headers }));
-      }
-      if (cacheUrl !== HF_DEFAULT_DIABLO_URL) {
-        await cache.put(HF_DEFAULT_DIABLO_URL, new Response(downloadedBlob.slice(0), { status: 200, headers }));
-      }
-      if (cacheUrl !== LOCAL_DIABLO_MODEL_URL) {
-        await cache.put(LOCAL_DIABLO_MODEL_URL, new Response(downloadedBlob.slice(0), { status: 200, headers }));
-      }
+      const headers = { 'content-type': 'application/octet-stream', 'content-length': String(downloadedBytes.byteLength) };
+      // One canonical entry is enough: the lookup below matches any cached
+      // Diablo request. Extra aliases cost a full ~222 MB copy each.
+      await cache.put(cacheUrl, new Response(downloadedBytes.buffer as ArrayBuffer, { status: 200, headers }));
       console.log(`[Diablo Model] 💾 Successfully saved Diablo weights into Cache API ("${DIABLO_MODEL_CACHE}")`);
     } catch { /* storage full or blocked - cache is best-effort */ }
   }
 
-  const ab = await downloadedBlob.arrayBuffer();
   return {
-    source: new Uint8Array(ab),
+    source: downloadedBytes,
   };
 }
 
@@ -818,9 +901,25 @@ async function ensureDiabloSession(forceWasm = false): Promise<{ session: any; e
 
       // Mobile devices are pinned to WASM to avoid uncatchable GPU OOM crashes.
       const isMobile = isMobileDevice();
-      const hasWebGpu = (isMobile || forceWasm) ? false : await detectWebGPU();
-      const ep: Engine = hasWebGpu ? 'webgpu' : 'wasm';
+      const probeStartedAt = performance.now();
+      const hasWebGpu = (isMobile || forceWasm)
+        ? !!knownWebgpuFailureReason
+        : await detectWebGPU();
+      console.info(`[Pixelify BG Worker] Diablo WebGPU preflight: ${Math.round(performance.now() - probeStartedAt)}ms, available=${hasWebGpu}`);
+      const ep: Engine = (isMobile || forceWasm) ? 'wasm' : hasWebGpu ? 'webgpu' : 'wasm';
       webgpuAvailable = hasWebGpu;
+
+      post({
+        type: 'CAPABILITIES',
+        engine: ep,
+        webgpuAvailable,
+        forceWasm,
+        isMobile,
+        model: 'diablo',
+        reason: isMobile && hasWebGpu
+          ? 'Mobile device detected: using Standard (CPU) mode to prevent browser memory crashes.'
+          : forceWasm ? knownWebgpuFailureReason || undefined : undefined,
+      });
 
       console.log(`[Diablo Model] 🧠 Initializing ONNX session (preferred engine: ${ep}, WebGPU available: ${hasWebGpu})...`);
       const modelSource = await getDiabloModelSource();
@@ -830,15 +929,40 @@ async function ensureDiabloSession(forceWasm = false): Promise<{ session: any; e
           postStatus('initializing-webgpu', { model: 'diablo' });
           try {
             console.log(`[Diablo Model] ⚡ Creating WebGPU ONNX InferenceSession (graphOptimizationLevel: 'all')...`);
+            // WebGPU only: listing 'wasm' as a second EP makes ORT materialise a
+            // second copy of all ~222 MB of weights for a fallback it never uses
+            // (the WASM retry below builds its own session instead).
             const sessionOptions: any = {
-              executionProviders: ['webgpu', 'wasm'],
+              executionProviders: ['webgpu'],
               graphOptimizationLevel: 'all',
             };
-            const session = await createOrtSessionSafe(ort, modelSource.source, sessionOptions);
+            const initAt = performance.now();
+            const sessionPromise = createOrtSessionSafe(ort, modelSource.source, sessionOptions);
+            let timedOut = false;
+            let timeoutId: ReturnType<typeof setTimeout> | undefined;
+            void sessionPromise.then((session) => {
+              if (timedOut) void session?.release?.();
+            }).catch(() => undefined);
+            const timeoutPromise = new Promise<never>((_, reject) => {
+              timeoutId = setTimeout(() => {
+                timedOut = true;
+                const error = new Error(`WebGPU Diablo session initialization exceeded ${WEBGPU_MODEL_INIT_TIMEOUT_MS}ms after model assets were ready.`);
+                (error as any).webgpuInitTimeout = true;
+                reject(error);
+              }, WEBGPU_MODEL_INIT_TIMEOUT_MS);
+            });
+            let session: any;
+            try {
+              session = await Promise.race([sessionPromise, timeoutPromise]);
+            } finally {
+              if (timeoutId !== undefined) clearTimeout(timeoutId);
+            }
             console.log(`[Diablo Model] ✅ WebGPU ONNX session created successfully!`);
+            console.info(`[Pixelify BG Worker] Diablo WebGPU model initialization: ${Math.round(performance.now() - initAt)}ms`);
             return { session, engine: 'webgpu' as Engine };
           } catch (error) {
             lastWebgpuError = errorMessage(error);
+            console.info('[Pixelify BG Worker] Diablo WebGPU initialization failed; switching to WASM.', lastWebgpuError);
             console.warn('[Diablo Model] ⚠️ WebGPU session create failed, falling back to WASM:', lastWebgpuError);
             post({
               type: 'ENGINE_FALLBACK',
@@ -846,6 +970,8 @@ async function ensureDiabloSession(forceWasm = false): Promise<{ session: any; e
               to: 'wasm',
               stage: 'diablo-initialization',
               reason: lastWebgpuError,
+              model: 'diablo',
+              workerRestartRequired: (error as any)?.webgpuInitTimeout === true,
             });
           }
         }
@@ -854,6 +980,12 @@ async function ensureDiabloSession(forceWasm = false): Promise<{ session: any; e
         const wasmOptions: any = {
           executionProviders: ['wasm'],
           graphOptimizationLevel: 'all',
+          // BiRefNet at 1024² needs enormous activation buffers. The default
+          // CPU arena + memory pattern keep the peak allocation alive for the
+          // whole session (multi-GB in a WASM heap that never shrinks), so trade
+          // a little speed for memory that is actually returned after a run.
+          enableCpuMemArena: false,
+          enableMemPattern: false,
         };
         let wasmSource = modelSource.source;
         if (wasmSource instanceof Uint8Array && wasmSource.byteLength === 0) {
@@ -1018,6 +1150,7 @@ async function runDiabloSessionSafe(info: { session: any; engine: Engine }, inpu
       to: 'wasm',
       stage: 'diablo-inference',
       reason: message,
+      model: 'diablo',
     });
     // WebGPU device faults poison the device for ORT; rebuild on WASM once.
     await disposeDiabloSession();
@@ -1086,6 +1219,10 @@ async function handleDiabloRemoval(data: WorkerMessage, id?: string | number): P
 async function handleMessage(data: WorkerMessage): Promise<void> {
   const { type, id, url, forceWasm, runtimeUrl, modelUrl, diabloModelUrl } = data || {};
   const requestedModel: BgModelKey = data?.model === 'diablo' ? 'diablo' : 'chopper';
+  if (data?.knownWebgpuFailure) {
+    knownWebgpuFailureReason = data.knownWebgpuFailure;
+    webgpuAvailable = true;
+  }
 
   if (type === 'INIT') {
     if (modelUrl && modelUrl !== modelUrlOverride) {
@@ -1111,9 +1248,10 @@ async function handleMessage(data: WorkerMessage): Promise<void> {
           webgpuAvailable,
           model: 'diablo',
           elapsedMs: Math.round(performance.now() - initStartedAt),
+          isMobile,
           reason: isMobile && webgpuAvailable
             ? 'Mobile device detected: using Standard (CPU) mode to prevent browser memory crashes.'
-            : undefined,
+            : forceWasm ? knownWebgpuFailureReason || undefined : undefined,
         });
       } else {
         const remover = await getRemover(forceWasm === true);
@@ -1125,9 +1263,10 @@ async function handleMessage(data: WorkerMessage): Promise<void> {
           webgpuAvailable,
           model: modelUrlOverride ? 'chopper.onnx' : MODEL_ID,
           elapsedMs: Math.round(performance.now() - initStartedAt),
+          isMobile,
           reason: isMobile && webgpuAvailable
             ? 'Mobile device detected: using Standard (CPU) mode to prevent browser memory crashes.'
-            : undefined,
+            : forceWasm ? knownWebgpuFailureReason || undefined : undefined,
         });
         void remover;
       }
@@ -1139,6 +1278,7 @@ async function handleMessage(data: WorkerMessage): Promise<void> {
         message: errorMessage(error),
         engineFailed: preferredEngine === 'webgpu' || !!lastWebgpuError,
         webgpuAvailable,
+        model: requestedModel,
       });
     }
     return;
@@ -1175,7 +1315,7 @@ async function handleMessage(data: WorkerMessage): Promise<void> {
       const inputBlob = await loadInputBlob(url || '');
       post({ type: 'JOB_STAGE', id, stage: 'running-inference', message: 'Neural network segmenting subject...' });
       postStatus('running-inference', { id, engine: chosenEngine });
-      const output = await runInference(inputBlob);
+      const output = await runInference(inputBlob, forceWasm === true);
       post({ type: 'JOB_STAGE', id, stage: 'encoding-output', message: 'Refining transparent cutout edges...' });
       postStatus('encoding-output', { id });
       if (!output || typeof output.toBlob !== 'function') {
@@ -1212,6 +1352,7 @@ async function handleMessage(data: WorkerMessage): Promise<void> {
           to: 'wasm',
           stage: 'remove-bg',
           reason: message,
+          model: 'chopper',
         });
       }
       post({

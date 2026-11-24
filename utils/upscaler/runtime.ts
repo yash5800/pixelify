@@ -8,11 +8,14 @@ let runtimePromise: Promise<LiteRtRuntime> | null = null;
 export function loadLiteRT(): Promise<LiteRtRuntime> {
   if (typeof window !== 'undefined') {
     const g = window as any;
-    g.HF_COMPACT_INTERNAL = process.env.HF_COMPACT_INTERNAL || process.env.NEXT_PUBLIC_HF_COMPACT_INTERNAL;
-    g.HF_COMPAT_INTERNAL = process.env.HF_COMPAT_INTERNAL || process.env.NEXT_PUBLIC_HF_COMPAT_INTERNAL || g.HF_COMPACT_INTERNAL;
-    g.HF_INTERNAL = process.env.HF_INTERNAL || process.env.NEXT_PUBLIC_HF_INTERNAL;
-    g.HF_JSPI_INTERNAL = process.env.HF_JSPI_INTERNAL || process.env.NEXT_PUBLIC_HF_JSPI_INTERNAL;
-    g.HF_THREADED_INTERNAL = process.env.HF_THREADED_INTERNAL || process.env.NEXT_PUBLIC_HF_THREADED_INTERNAL;
+    // Keep the execution runtime on the same origin as the app. The model
+    // itself may be remote, but a stalled WASM fetch otherwise leaves the
+    // workspace stuck at "Loading AI model" with no model progress to show.
+    g.HF_COMPACT_INTERNAL = '/litert/wasm/litert_wasm_compat_internal.wasm';
+    g.HF_COMPAT_INTERNAL = g.HF_COMPACT_INTERNAL;
+    g.HF_INTERNAL = '/litert/wasm/litert_wasm_internal.wasm';
+    g.HF_JSPI_INTERNAL = '/litert/wasm/litert_wasm_jspi_internal.wasm';
+    g.HF_THREADED_INTERNAL = '/litert/wasm/litert_wasm_threaded_internal.wasm';
   }
   if (!runtimePromise) {
     runtimePromise = supportsFeature('jspi')

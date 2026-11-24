@@ -29,7 +29,7 @@ const FAQ_ITEMS: BrandFaqItem[] = [
   },
   {
     q: 'What can I export, and is there a watermark?',
-    a: 'Lossless PNG or WebP at the full upscaled resolution. No watermark, no quality cap, no daily limit. what you see in the preview is exactly what you download.',
+    a: 'Lossless PNG, or WebP at visually-lossless quality (typically ~7× smaller) at the full upscaled resolution. No watermark, no resolution cap, no daily limit — what you see in the preview is what you download.',
   },
   {
     q: 'Will it work on my laptop or phone?',

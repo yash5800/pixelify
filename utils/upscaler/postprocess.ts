@@ -6,6 +6,8 @@ export interface FinalizedImage {
   blobUrl: string;
   width: number;
   height: number;
+  /** Size of the encoded PNG in bytes. Photos at this resolution are ~1 B/px. */
+  bytes: number;
 }
 
 interface PendingEntry {
@@ -74,43 +76,77 @@ export function postProcessOnMainThread(
   options: EnhancementOptions,
 ): Promise<FinalizedImage> {
   return new Promise<FinalizedImage>((resolve, reject) => {
-    try {
-      let final = document.createElement('canvas');
-      final.width = srcW;
-      final.height = srcH;
-      const baseCtx = final.getContext('2d', { willReadFrequently: true });
-      if (!baseCtx) throw new Error('Canvas 2D context is unavailable.');
-      baseCtx.putImageData(new ImageData(new Uint8ClampedArray(rgba), srcW, srcH), 0, 0);
+    let canvas: HTMLCanvasElement | null = document.createElement('canvas');
+    let scratch: HTMLCanvasElement | null = null;
+    const releaseCanvases = () => {
+      if (scratch) {
+        scratch.width = 0;
+        scratch.height = 0;
+        scratch = null;
+      }
+      if (canvas) {
+        canvas.width = 0;
+        canvas.height = 0;
+        canvas = null;
+      }
+    };
 
-      if (srcW !== targetW || srcH !== targetH) {
-        const scaled = document.createElement('canvas');
-        scaled.width = targetW;
-        scaled.height = targetH;
-        const scalerCtx = scaled.getContext('2d');
-        if (!scalerCtx) throw new Error('Canvas 2D context is unavailable.');
-        scalerCtx.imageSmoothingEnabled = true;
-        scalerCtx.imageSmoothingQuality = 'high';
-        scalerCtx.drawImage(final, 0, 0, targetW, targetH);
-        final = scaled;
+    try {
+      // Wrap the caller's buffer — do not copy it. ImageData takes ownership of
+      // the array view, so enhancement can run in place. (The extra view keeps
+      // TypeScript's ArrayBufferLike/Uint8ClampedArray generic satisfied.)
+      const source = new ImageData(
+        new Uint8ClampedArray(rgba.buffer as ArrayBuffer, rgba.byteOffset, rgba.byteLength),
+        srcW,
+        srcH,
+      );
+      const needsResize = srcW !== targetW || srcH !== targetH;
+
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) throw new Error('Canvas 2D context is unavailable.');
+
+      let output: ImageData;
+      if (needsResize) {
+        scratch = document.createElement('canvas');
+        scratch.width = srcW;
+        scratch.height = srcH;
+        const scratchCtx = scratch.getContext('2d', { willReadFrequently: true });
+        if (!scratchCtx) throw new Error('Canvas 2D context is unavailable.');
+        scratchCtx.putImageData(source, 0, 0);
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(scratch, 0, 0, targetW, targetH);
+
+        // The destination canvas owns its pixels; drop the source surface now.
+        scratch.width = 0;
+        scratch.height = 0;
+        scratch = null;
+
+        output = ctx.getImageData(0, 0, targetW, targetH);
+        enhanceImageDataBuffer(output.data, targetW, targetH, options);
+      } else {
+        output = source;
+        enhanceImageDataBuffer(output.data, targetW, targetH, options);
       }
 
-      const finalCtx = final.getContext('2d', { willReadFrequently: true });
-      if (!finalCtx) throw new Error('Canvas 2D context is unavailable.');
-      const imgData = finalCtx.getImageData(0, 0, targetW, targetH);
-      enhanceImageDataBuffer(imgData.data, targetW, targetH, options);
-      finalCtx.putImageData(imgData, 0, 0);
+      ctx.putImageData(output, 0, 0);
 
-      final.toBlob(
+      canvas.toBlob(
         (blob) => {
+          releaseCanvases();
           if (!blob) {
             reject(new Error('PNG encoding failed.'));
             return;
           }
-          resolve({ blobUrl: URL.createObjectURL(blob), width: targetW, height: targetH });
+          resolve({ blobUrl: URL.createObjectURL(blob), width: targetW, height: targetH, bytes: blob.size });
         },
         'image/png',
       );
     } catch (error) {
+      releaseCanvases();
       reject(error instanceof Error ? error : new Error(String(error)));
     }
   });
@@ -149,5 +185,5 @@ export async function processFinalImage(
     return postProcessOnMainThread(new Uint8ClampedArray(returnedRgba), srcW, srcH, targetW, targetH, options);
   }
   const blob = new Blob([response.png], { type: 'image/png' });
-  return { blobUrl: URL.createObjectURL(blob), width: response.width, height: response.height };
+  return { blobUrl: URL.createObjectURL(blob), width: response.width, height: response.height, bytes: response.png.byteLength };
 }

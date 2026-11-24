@@ -79,6 +79,88 @@ export function resizeChannel(data: Float32Array, srcW: number, srcH: number, ds
   return result;
 }
 
+/** Quantize a normalized 0..1 plane to 8-bit. */
+export function toU8Plane(data: Float32Array): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(data.length);
+  for (let i = 0; i < data.length; i++) out[i] = data[i] * 255;
+  return out;
+}
+
+/**
+ * Upscale the chroma pair in ONE canvas round-trip (Cb in red, Cr in green)
+ * instead of one full-size canvas per channel. Keeps the working set near the
+ * destination size instead of allocating float planes at the output resolution.
+ */
+export function upscaleChromaPair(
+  Cb: Uint8ClampedArray,
+  Cr: Uint8ClampedArray,
+  srcW: number,
+  srcH: number,
+  dstW: number,
+  dstH: number,
+): { Cb: Uint8ClampedArray; Cr: Uint8ClampedArray } {
+  if (srcW === dstW && srcH === dstH) {
+    return { Cb: Cb.slice(), Cr: Cr.slice() };
+  }
+
+  const packed = new Uint8ClampedArray(srcW * srcH * 4);
+  for (let i = 0; i < srcW * srcH; i++) {
+    packed[i * 4] = Cb[i];
+    packed[i * 4 + 1] = Cr[i];
+    packed[i * 4 + 2] = 0;
+    packed[i * 4 + 3] = 255;
+  }
+
+  const source = document.createElement('canvas');
+  source.width = srcW;
+  source.height = srcH;
+  const sourceCtx = source.getContext('2d', { willReadFrequently: true })!;
+  sourceCtx.putImageData(new ImageData(packed, srcW, srcH), 0, 0);
+
+  const target = document.createElement('canvas');
+  target.width = dstW;
+  target.height = dstH;
+  const targetCtx = target.getContext('2d', { willReadFrequently: true })!;
+  targetCtx.imageSmoothingEnabled = true;
+  targetCtx.imageSmoothingQuality = 'high';
+  targetCtx.drawImage(source, 0, 0, dstW, dstH);
+  const scaled = targetCtx.getImageData(0, 0, dstW, dstH).data;
+
+  source.width = 0;
+  source.height = 0;
+  target.width = 0;
+  target.height = 0;
+
+  const outCb = new Uint8ClampedArray(dstW * dstH);
+  const outCr = new Uint8ClampedArray(dstW * dstH);
+  for (let i = 0; i < outCb.length; i++) {
+    outCb[i] = scaled[i * 4];
+    outCr[i] = scaled[i * 4 + 1];
+  }
+  return { Cb: outCb, Cr: outCr };
+}
+
+/** Merge 8-bit Y/Cb/Cr planes into an RGBA buffer (alpha fully opaque). */
+export function mergeYCbCrToRgba8(
+  Y: Uint8ClampedArray,
+  Cb: Uint8ClampedArray,
+  Cr: Uint8ClampedArray,
+  w: number,
+  h: number,
+): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(w * h * 4);
+  for (let i = 0; i < Y.length; i++) {
+    const y = Y[i] / 255;
+    const cb = Cb[i] / 255 - 0.5;
+    const cr = Cr[i] / 255 - 0.5;
+    out[i * 4] = (y + 1.402 * cr) * 255;
+    out[i * 4 + 1] = (y - 0.3441 * cb - 0.7141 * cr) * 255;
+    out[i * 4 + 2] = (y + 1.772 * cb) * 255;
+    out[i * 4 + 3] = 255;
+  }
+  return out;
+}
+
 /**
  * Separable box blur over the RGB planes of an RGBA buffer (alpha is kept
  * verbatim). O(w·h) regardless of radius and equivalent to the clamped

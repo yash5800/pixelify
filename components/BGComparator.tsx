@@ -455,6 +455,9 @@ export default function BGComparator({
     x: 0,
     y: 0,
   });
+  // Each snapshot is a full 2048² RGBA ImageData (~16 MB). Keep the history
+  // shallow so a long brushing session cannot hold hundreds of MB of pixels.
+  const MAX_BRUSH_HISTORY = 8;
   const [undoStack, setUndoStack] = useState<ImageData[]>([]);
   const [redoStack, setRedoStack] = useState<ImageData[]>([]);
 
@@ -462,6 +465,21 @@ export default function BGComparator({
   useEffect(() => {
     onHistoryChange?.(undoStack.length > 0, redoStack.length > 0);
   }, [undoStack.length, redoStack.length, onHistoryChange]);
+
+  // Give back the stage's pixel buffers when it unmounts (tab switch, workspace
+  // clear, route change). Zeroing the backing stores matters: a detached canvas
+  // can keep its full-resolution buffer alive long after the element is gone.
+  useEffect(() => {
+    return () => {
+      baseImgCanvasRef.current = null;
+      lastDrawnCanvasRef.current = null;
+      const canvas = brushCanvasRef.current;
+      if (canvas) {
+        canvas.width = 0;
+        canvas.height = 0;
+      }
+    };
+  }, []);
 
   const activeJobUrlRef = useRef<string | null>(null);
   const lastPaintedUrlRef = useRef<string | null>(null);
@@ -541,8 +559,11 @@ export default function BGComparator({
 
     activeJobUrlRef.current = resultUrl;
 
+    // The retry below must die with this effect: when the cutout tab unmounts
+    // before the canvas exists, an un-cancelled rAF loop would spin forever.
+    let cancelled = false;
     const paint = () => {
-      if (activeJobUrlRef.current !== resultUrl) return;
+      if (cancelled || activeJobUrlRef.current !== resultUrl) return;
       const c = brushCanvasRef.current;
       if (!c) {
         // If canvas is not yet mounted in the DOM, retry on next frame
@@ -561,17 +582,18 @@ export default function BGComparator({
       }
 
       img.onload = () => {
-        if (activeJobUrlRef.current !== resultUrl) return;
+        if (cancelled || activeJobUrlRef.current !== resultUrl) return;
         const targetCanvas = brushCanvasRef.current;
         if (!targetCanvas) return;
         drawCutoutImageToCanvas(targetCanvas, img, resultUrl);
       };
 
       img.onerror = () => {
+        if (cancelled) return;
         if (img.crossOrigin) {
           const fallback = new Image();
           fallback.onload = () => {
-            if (activeJobUrlRef.current !== resultUrl) return;
+            if (cancelled || activeJobUrlRef.current !== resultUrl) return;
             const targetCanvas = brushCanvasRef.current;
             if (!targetCanvas) return;
             drawCutoutImageToCanvas(targetCanvas, fallback, resultUrl);
@@ -584,6 +606,9 @@ export default function BGComparator({
     };
 
     paint();
+    return () => {
+      cancelled = true;
+    };
   }, [job?.id, job?.resultUrl, job?.sourceUrl, isCutoutActive, drawCutoutImageToCanvas]);
 
   // Handle Undo trigger
@@ -598,7 +623,7 @@ export default function BGComparator({
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (ctx && prev) {
         const snap = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        setRedoStack((s) => [...s, snap]);
+        setRedoStack((s) => [...s.slice(-(MAX_BRUSH_HISTORY - 1)), snap]);
         ctx.putImageData(prev, 0, 0);
         canvas.toBlob((blob) => {
           if (blob && onBrushStroke) {
@@ -623,7 +648,7 @@ export default function BGComparator({
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (ctx && next) {
         const snap = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        setUndoStack((s) => [...s, snap]);
+        setUndoStack((s) => [...s.slice(-(MAX_BRUSH_HISTORY - 1)), snap]);
         ctx.putImageData(next, 0, 0);
         canvas.toBlob((blob) => {
           if (blob && onBrushStroke) {
@@ -733,7 +758,7 @@ export default function BGComparator({
     if (canvas) {
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (ctx) {
-        setUndoStack((s) => [...s.slice(-15), ctx.getImageData(0, 0, canvas.width, canvas.height)]);
+        setUndoStack((s) => [...s.slice(-(MAX_BRUSH_HISTORY - 1)), ctx.getImageData(0, 0, canvas.width, canvas.height)]);
         setRedoStack([]);
       }
     }

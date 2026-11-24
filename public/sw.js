@@ -40,7 +40,9 @@ self.addEventListener('activate', (event) => {
       .then((keys) =>
         Promise.all(
           keys.map((key) => {
-            if (key !== CACHE_NAME) {
+            // Retire only previous app-shell caches. LiteRT/ONNX model caches
+            // live in Cache Storage too and must survive worker activation.
+            if (key.startsWith('pixelify-cache-') && key !== CACHE_NAME) {
               return caches.delete(key);
             }
           })

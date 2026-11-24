@@ -1,11 +1,13 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useApp } from '../AppProvider';
 import Footer from '../Footer';
 import BGRemoveWorkspace from '../BGRemoveWorkspace';
 import Bgmarquee from '../bgremove/Bgmarquee';
 import { BgSampleGallery, BgShowcase, BgPipeline, BgPrecision, BgFaq } from '../bgremove/BgSections';
 import DeviceRecommendationNotice from '../DeviceRecommendationNotice';
+import { bgRemoverService } from '../../services/bgRemoverService';
 
 export default function BgRemoveView() {
   const {
@@ -19,6 +21,10 @@ export default function BgRemoveView() {
     setBgWebgpuAvailable,
     loadBgSample,
   } = useApp();
+
+  // Leaving the BG Remover tab should not leave the model's WASM/GPU arena
+  // resident in the renderer; the weights stay cached for an instant reload.
+  useEffect(() => () => bgRemoverService.recycleIdleWorker(), []);
 
   return (
     <div className="flex flex-col gap-8 w-full px-2">

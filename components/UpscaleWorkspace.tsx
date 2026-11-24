@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { MODELS, buildPresetOptions } from "../lib/constants";
+import { formatBytes } from "../lib/bgUtils";
 import { useTranslation } from '@/locales';
 import type {
   ModelKey,
@@ -83,7 +84,7 @@ interface UpscaleWorkspaceProps {
   onUpscale: (id: string) => void;
   /** Aborts the in-flight enhancement for the active item (Cancel button while processing). */
   onCancel?: (id: string) => void;
-  onDownload: (id: string, format?: "png" | "webp" | "jpeg") => void;
+  onDownload: (id: string, format?: "png" | "webp" | "jpeg") => Promise<void> | void;
   onReset?: () => void;
 
   /** MOBILE: opens the navigation sidebar drawer (hamburger icon, top-left) */
@@ -344,6 +345,24 @@ export default function UpscaleWorkspace({
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [soundOn, setSoundOn] = useState(() => isSoundEnabled());
 
+  // Download-format menu (WebP default, PNG/JPEG on demand) and its busy flag
+  // so a large re-encode cannot be triggered twice from a double click.
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const downloadMenuRef = useRef<HTMLDivElement | null>(null);
+  const downloadingRef = useRef(false);
+
+  useEffect(() => {
+    if (!downloadMenuOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!downloadMenuRef.current?.contains(event.target as Node)) {
+        setDownloadMenuOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [downloadMenuOpen]);
+
   const handleToggleSound = () => {
     primeAudio();
     const next = !soundOn;
@@ -436,7 +455,15 @@ export default function UpscaleWorkspace({
         </span>
         {activeItem.status === "completed" && !!activeItem.result && (
           <span className="text-[9.5px] sm:text-[11px] font-mono px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-[#00FF85]/15 text-[#00FF85] border border-[#00FF85]/30 font-bold shrink-0">
-            ✓ {t.upscaleWorkspace?.enhancedBadge || "Enhanced"} {activeItem?.options?.scale ? `${activeItem.options.scale}x` : ""}
+            ✓ {t.upscaleWorkspace?.enhancedBadge || "Enhanced"} {activeItem?.options?.scale ? `${activeItem.options.scale}x` : ""}{(() => {
+              const ms = activeItem.result?.time;
+              if (!ms || ms <= 0) return "";
+              const totalSeconds = ms / 1000;
+              if (totalSeconds < 60) return ` · ${totalSeconds.toFixed(1)}s`;
+              const minutes = Math.floor(totalSeconds / 60);
+              const seconds = Math.round(totalSeconds % 60);
+              return ` · ${minutes}m ${seconds}s`;
+            })()}
           </span>
         )}
         {activeItem.status === "processing" && (
@@ -750,6 +777,48 @@ export default function UpscaleWorkspace({
   );
 
   /* ----------------------------------------------------------
+     DOWNLOAD FORMAT
+     The in-memory master is a lossless PNG (~1 byte/pixel — a 48 MP
+     upscale is ~50 MB). Photos are re-encoded to WebP on download by
+     default, with PNG kept for archival use and JPEG for the smallest file.
+     ---------------------------------------------------------- */
+  const downloadOptions = [
+    {
+      format: "webp" as const,
+      label: t.upscaleWorkspace?.fmtWebp || "WebP",
+      badge: t.upscaleWorkspace?.fmtRecommended || "Recommended",
+      hint: t.upscaleWorkspace?.fmtWebpHint || "~7x smaller · no visible loss",
+    },
+    {
+      format: "jpeg" as const,
+      label: t.upscaleWorkspace?.fmtJpeg || "JPEG",
+      badge: t.upscaleWorkspace?.fmtSmallest || "Smallest",
+      hint: t.upscaleWorkspace?.fmtJpegHint || "No transparency · photos only",
+    },
+    {
+      format: "png" as const,
+      label: t.upscaleWorkspace?.fmtPng || "PNG",
+      badge: t.upscaleWorkspace?.fmtLossless || "Lossless",
+      hint: activeItem.result?.bytes
+        ? `Master · ${formatBytes(activeItem.result.bytes)}`
+        : "Master · large file",
+    },
+  ];
+
+  const handleDownload = async (format: "png" | "webp" | "jpeg") => {
+    if (downloadingRef.current) return;
+    downloadingRef.current = true;
+    setDownloadMenuOpen(false);
+    setDownloading(true);
+    try {
+      await onDownload(activeItem.id, format);
+    } finally {
+      downloadingRef.current = false;
+      setDownloading(false);
+    }
+  };
+
+  /* ----------------------------------------------------------
      SHARED PRIMARY ACTION BUTTON - identical on mobile and desktop
      (idle → "Upscale {scale}x" · completed → "Download Result").
      While processing, the same row gains a Cancel button next to
@@ -759,19 +828,72 @@ export default function UpscaleWorkspace({
     <div className="shrink-0">
       {hasResult ? (
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => onDownload(activeItem.id, "png")}
-            className="
-              flex flex-1 cursor-pointer items-center justify-center gap-2
-              rounded-xl bg-[#00FF85] px-4 py-3 text-sm font-bold text-black
-              shadow-[0_10px_30px_rgba(0,255,133,0.25)]
-              transition-all duration-200 hover:bg-[#00E599] active:scale-[0.98]
-            "
+          <div
+            className="relative flex-1"
+            ref={downloadMenuRef}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") setDownloadMenuOpen(false);
+            }}
           >
-            <Download className="h-4 w-4" />
-            <span>{t.upscaleWorkspace?.btnDownload || t.common.download || "Download"}</span>
-          </button>
+            <div className="flex items-stretch overflow-hidden rounded-xl bg-[#00FF85] shadow-[0_10px_30px_rgba(0,255,133,0.25)]">
+              <button
+                type="button"
+                onClick={() => handleDownload("webp")}
+                disabled={downloading}
+                className="
+                  flex flex-1 cursor-pointer items-center justify-center gap-2
+                  whitespace-nowrap px-3 py-3 text-sm font-bold text-black
+                  transition-all duration-200 hover:bg-[#00E599] active:scale-[0.98]
+                  disabled:opacity-60 sm:px-4
+                "
+              >
+                <Download className="h-4 w-4" />
+                <span>
+                  {downloading
+                    ? t.upscaleWorkspace?.btnPreparing || "Preparing..."
+                    : t.upscaleWorkspace?.btnDownloadWebp || "Download WebP"}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDownloadMenuOpen((open) => !open)}
+                disabled={downloading}
+                aria-label={t.upscaleWorkspace?.downloadFormat || "Download format"}
+                aria-expanded={downloadMenuOpen}
+                aria-haspopup="menu"
+                className="flex cursor-pointer items-center justify-center border-l border-black/15 px-2.5 text-black transition-colors hover:bg-[#00E599] disabled:opacity-60"
+              >
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform duration-200 ${downloadMenuOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+            </div>
+
+            {downloadMenuOpen && (
+              <div
+                role="menu"
+                className="absolute bottom-full left-0 right-0 z-50 mb-2 flex flex-col gap-0.5 rounded-2xl border border-white/15 bg-[#141418] p-2 shadow-2xl backdrop-blur-2xl animate-in fade-in slide-in-from-bottom-2 duration-150"
+              >
+                {downloadOptions.map((option) => (
+                  <button
+                    key={option.format}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => handleDownload(option.format)}
+                    className="flex w-full cursor-pointer flex-col gap-0.5 rounded-xl px-3 py-2 text-left transition-colors hover:bg-white/[0.07]"
+                  >
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="text-[13px] font-semibold text-white">{option.label}</span>
+                      <span className="rounded-md bg-[#00FF85]/15 px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-[#00FF85]">
+                        {option.badge}
+                      </span>
+                    </span>
+                    <span className="text-[11px] text-white/45">{option.hint}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <button
             type="button"

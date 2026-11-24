@@ -1,6 +1,6 @@
 import { MODELS } from '../lib/constants';
 import type { ModelKey } from '../types';
-import { createSession, isUpscalerModelCached, runTile } from './upscaler/inference';
+import { createSession, isUpscalerModelCached, runTileFromPlanes } from './upscaler/inference';
 import { loadLiteRT } from './upscaler/runtime';
 import type { LiteRtRuntime } from './upscaler/runtime';
 import type { LiteRtSession, ModelLoadProgress } from './upscaler/inference';
@@ -8,6 +8,15 @@ import type { LiteRtSession, ModelLoadProgress } from './upscaler/inference';
 /** Compatibility entry points used by the existing hooks; all execution is LiteRT.js. */
 export { createSession, isUpscalerModelCached, loadLiteRT };
 export type { LiteRtSession, LiteRtRuntime, ModelLoadProgress };
+
+/**
+ * Final-pass tile sink. Streaming straight into 8-bit buffers avoids the
+ * multi-gigabyte `Float32Array(dstW*dstH*ch)` accumulation (and the second
+ * RGBA copy) that made large 4× outputs exceed 2 GB of tab memory.
+ */
+export type PassSink =
+  | { kind: 'rgba8'; data: Uint8ClampedArray }
+  | { kind: 'y8'; data: Uint8ClampedArray };
 
 export async function runPass(
   runtime: LiteRtRuntime,
@@ -21,7 +30,8 @@ export async function runPass(
   onProgress: (pct: number, text: string) => void,
   onSessionUpdated?: (newSession: LiteRtSession) => void,
   checkCancelled?: () => void,
-): Promise<Float32Array> {
+  sink?: PassSink,
+): Promise<Float32Array | null> {
   const m = MODELS[modelKey];
   const tileSize = m.tileSize;
   const scale = m.scale;
@@ -31,8 +41,21 @@ export async function runPass(
   const numHTiles = Math.ceil(srcW / tileSize);
   const numVTiles = Math.ceil(srcH / tileSize);
   const totalTiles = numHTiles * numVTiles;
-  const outData = new Float32Array(dstW * dstH * ch);
+  if (sink?.kind === 'rgba8') {
+    if (ch !== 3) throw new Error(`rgba8 sink requires an RGB model (${modelKey} is single-channel).`);
+    if (sink.data.length !== dstW * dstH * 4) {
+      throw new Error(`rgba8 sink is ${sink.data.length} bytes; expected ${dstW * dstH * 4}.`);
+    }
+  } else if (sink?.kind === 'y8') {
+    if (ch !== 1) throw new Error(`y8 sink requires a single-channel model (${modelKey} is RGB).`);
+    if (sink.data.length !== dstW * dstH) {
+      throw new Error(`y8 sink is ${sink.data.length} bytes; expected ${dstW * dstH}.`);
+    }
+  }
+  // Only non-final passes (8× second pass on tiny images) keep a float buffer.
+  const outData = sink ? null : new Float32Array(dstW * dstH * ch);
   let done = 0;
+
   const outputShape = Array.from(session.outputDetails[0].shape as ArrayLike<number>);
   const outputHwc = outputShape.length === 4 && outputShape[3] === ch;
   const outputHeight = outputHwc ? outputShape[1] : outputShape[2];
@@ -54,6 +77,15 @@ export async function runPass(
   await yieldToBrowser();
   checkCancelled?.();
   let lastReportedPct = -1;
+  // Yield on a time budget instead of once per tile. Awaiting a frame for every
+  // 128px tile added ~16 ms each — tens of seconds on a 2000-tile run — while
+  // most tiles only hold the page thread for a millisecond or two.
+  let lastYieldAt = performance.now();
+  const yieldIfBusy = async () => {
+    if (performance.now() - lastYieldAt < 40) return;
+    await yieldToBrowser();
+    lastYieldAt = performance.now();
+  };
   for (let ty = 0; ty < numVTiles; ty++) for (let tx = 0; tx < numHTiles; tx++) {
     checkCancelled?.();
     done++;
@@ -67,17 +99,6 @@ export async function runPass(
     }
     const inX = tx * tileSize;
     const inY = ty * tileSize;
-    const tileHWC = new Float32Array(tileSize * tileSize * ch);
-    for (let y = 0; y < tileSize; y++) for (let x = 0; x < tileSize; x++) {
-      const sy = Math.min(inY + y, srcH - 1);
-      const sx = Math.min(inX + x, srcW - 1);
-      const srcOff = (sy * srcW + sx) * ch;
-      const dstOff = (y * tileSize + x) * ch;
-      for (let c = 0; c < ch; c++) tileHWC[dstOff + c] = data[srcOff + c];
-    }
-    const tileCHW = new Float32Array(tileHWC.length);
-    for (let c = 0; c < ch; c++) for (let y = 0; y < tileSize; y++) for (let x = 0; x < tileSize; x++)
-      tileCHW[c * tileSize * tileSize + y * tileSize + x] = tileHWC[(y * tileSize + x) * ch + c];
 
     const expectedElements = tileSize * scale * tileSize * scale * ch;
     const assertOutput = (output: Float32Array) => {
@@ -87,7 +108,7 @@ export async function runPass(
     };
     let rawOut: Float32Array;
     try {
-      rawOut = await runTile(runtime, session, tileCHW, tileSize, tileSize, ch);
+      rawOut = await runTileFromPlanes(runtime, session, data, srcW, srcH, inX, inY, tileSize, tileSize, ch);
       assertOutput(rawOut);
     } catch (error) {
       if (session.__engine !== 'webgpu') throw error;
@@ -96,7 +117,7 @@ export async function runPass(
       session.__fallback = true;
       session.__fallbackReason = error instanceof Error ? error.message : String(error);
       onSessionUpdated?.(session);
-      rawOut = await runTile(runtime, session, tileCHW, tileSize, tileSize, ch);
+      rawOut = await runTileFromPlanes(runtime, session, data, srcW, srcH, inX, inY, tileSize, tileSize, ch);
       assertOutput(rawOut);
     }
 
@@ -105,15 +126,48 @@ export async function runPass(
     const th = Math.min(tileFull, dstH - ty * tileFull);
     const outX = tx * tileFull;
     const outY = ty * tileFull;
-    for (let y = 0; y < th; y++) for (let x = 0; x < tw; x++) {
-      const dst = ((outY + y) * dstW + outX + x) * ch;
-      const pixel = y * tileFull + x;
-      for (let c = 0; c < ch; c++) {
-        const src = outputHwc ? pixel * ch + c : c * tileFull * tileFull + pixel;
-        outData[dst + c] = rawOut[src];
+    if (sink?.kind === 'rgba8') {
+      const out = sink.data;
+      for (let y = 0; y < th; y++) {
+        let dst = ((outY + y) * dstW + outX) * 4;
+        for (let x = 0; x < tw; x++) {
+          const pixel = y * tileFull + x;
+          const base = outputHwc ? pixel * ch : pixel;
+          if (outputHwc) {
+            out[dst] = rawOut[base] * 255;
+            out[dst + 1] = rawOut[base + 1] * 255;
+            out[dst + 2] = rawOut[base + 2] * 255;
+          } else {
+            const plane = tileFull * tileFull;
+            out[dst] = rawOut[base] * 255;
+            out[dst + 1] = rawOut[base + plane] * 255;
+            out[dst + 2] = rawOut[base + plane * 2] * 255;
+          }
+          out[dst + 3] = 255;
+          dst += 4;
+        }
+      }
+    } else if (sink?.kind === 'y8') {
+      const out = sink.data;
+      for (let y = 0; y < th; y++) {
+        let dst = (outY + y) * dstW + outX;
+        for (let x = 0; x < tw; x++) {
+          const pixel = y * tileFull + x;
+          out[dst++] = rawOut[pixel] * 255;
+        }
+      }
+    } else {
+      const target = outData!;
+      for (let y = 0; y < th; y++) for (let x = 0; x < tw; x++) {
+        const dst = ((outY + y) * dstW + outX + x) * ch;
+        const pixel = y * tileFull + x;
+        for (let c = 0; c < ch; c++) {
+          const src = outputHwc ? pixel * ch + c : c * tileFull * tileFull + pixel;
+          target[dst + c] = rawOut[src];
+        }
       }
     }
-    await yieldToBrowser();
+    await yieldIfBusy();
     checkCancelled?.();
   }
   return outData;

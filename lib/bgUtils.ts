@@ -1,7 +1,11 @@
 export const makeId = (): string => crypto.randomUUID();
 
-export const formatBytes = (size: number): string =>
-  `${(size / 1024 / 1024).toFixed(size > 1024 * 1024 ? 1 : 0)} MB`;
+export const formatBytes = (size: number): string => {
+  if (!Number.isFinite(size) || size <= 0) return '0 KB';
+  if (size < 1024) return `${Math.round(size)} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(0)} KB`;
+  return `${(size / 1024 / 1024).toFixed(1)} MB`;
+};
 
 export const downloadName = (name: string): string =>
   `${name.replace(/\.[^.]+$/, '') || 'image'}-cutout.png`;

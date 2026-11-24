@@ -57,36 +57,7 @@ if (typeof __filename != "undefined") {
 // `/` should be present at the end if `scriptDirectory` is not empty
 var scriptDirectory = "";
 
-function getRemoteWasmUrl(path) {
-  var fileName = path ? path.split("/").pop() : "";
-  var envMap = {
-    "litert_wasm_compat_internal.wasm": (typeof process !== "undefined" && (process.env?.HF_COMPACT_INTERNAL || process.env?.HF_COMPAT_INTERNAL || process.env?.NEXT_PUBLIC_HF_COMPACT_INTERNAL || process.env?.NEXT_PUBLIC_HF_COMPAT_INTERNAL))
-      || globalThis.HF_COMPACT_INTERNAL
-      || globalThis.HF_COMPAT_INTERNAL
-      || globalThis.__PIXELIFY_ENV__?.HF_COMPACT_INTERNAL
-      || "https://huggingface.co/Joker5800/pixelify/resolve/main/wasm/litert_wasm_compat_internal.wasm",
-    "litert_wasm_internal.wasm": (typeof process !== "undefined" && (process.env?.HF_INTERNAL || process.env?.NEXT_PUBLIC_HF_INTERNAL))
-      || globalThis.HF_INTERNAL
-      || globalThis.__PIXELIFY_ENV__?.HF_INTERNAL
-      || "https://huggingface.co/Joker5800/pixelify/resolve/main/wasm/litert_wasm_internal.wasm",
-    "litert_wasm_jspi_internal.wasm": (typeof process !== "undefined" && (process.env?.HF_JSPI_INTERNAL || process.env?.NEXT_PUBLIC_HF_JSPI_INTERNAL))
-      || globalThis.HF_JSPI_INTERNAL
-      || globalThis.__PIXELIFY_ENV__?.HF_JSPI_INTERNAL
-      || "https://huggingface.co/Joker5800/pixelify/resolve/main/wasm/litert_wasm_jspi_internal.wasm",
-    "litert_wasm_threaded_internal.wasm": (typeof process !== "undefined" && (process.env?.HF_THREADED_INTERNAL || process.env?.NEXT_PUBLIC_HF_THREADED_INTERNAL))
-      || globalThis.HF_THREADED_INTERNAL
-      || globalThis.__PIXELIFY_ENV__?.HF_THREADED_INTERNAL
-      || "https://huggingface.co/Joker5800/pixelify/resolve/main/wasm/litert_wasm_threaded_internal.wasm",
-  };
-  var target = envMap[fileName] || (fileName && fileName.endsWith(".wasm") ? envMap[fileName] : null);
-  return target ? target.replace("/blob/", "/resolve/") : null;
-}
-
 function locateFile(path) {
-  var remote = getRemoteWasmUrl(path);
-  if (remote) {
-    return remote;
-  }
   if (Module["locateFile"]) {
     return Module["locateFile"](path, scriptDirectory);
   }
@@ -419,9 +390,6 @@ async function createWasm() {
   wasmBinaryFile ??= findWasmBinary();
   var result = await instantiateAsync(wasmBinary, wasmBinaryFile, info);
   var exports = receiveInstantiationResult(result);
-  if (wasmBinaryFile && (wasmBinaryFile.startsWith("http://") || wasmBinaryFile.startsWith("https://"))) {
-    console.log(`[LiteRT] Successfully loaded WASM from URL: ${wasmBinaryFile}`);
-  }
   return exports;
 }
 

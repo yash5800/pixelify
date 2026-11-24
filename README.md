@@ -122,3 +122,12 @@ The visitor and leaderboard API requires a server runtime and is not available f
 **Memory errors**
 - Reduce input image size
 - Use Vitality model instead of larger models
+
+## Contributors
+
+- [@yash5800](https://github.com/yash5800) - Creator & Lead Developer
+- [@Bskn1412](https://github.com/Bskn1412) - Contributor
+- **[Antigravity](https://deepmind.google)** (Google DeepMind) - AI Assistant & Contributor
+- **[OpenCode](https://opencode.ai/)** - AI Contributor
+- **[Codex](https://openai.com)** (OpenAI) - AI Contributor
+

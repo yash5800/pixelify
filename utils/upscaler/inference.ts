@@ -41,7 +41,7 @@ function modelUrl(path: string): string {
 
 function getCandidateUrls(path: string): string[] {
   const primary = modelUrl(path);
-  const urls = [primary];
+  const urls: string[] = [];
   if (typeof location !== 'undefined') {
     try {
       const parsed = new URL(primary);
@@ -49,9 +49,10 @@ function getCandidateUrls(path: string): string[] {
       if (filename && filename.endsWith('.tflite')) {
         const local = new URL(`/models/${filename}`, location.origin);
         local.searchParams.set('litert', MODEL_ASSET_REVISION);
-        if (local.href !== primary && !urls.includes(local.href)) {
-          urls.push(local.href);
-        }
+        // Prefer same-origin assets so a remote override or CDN outage cannot
+        // delay a model that is already shipped with the app.
+        urls.push(local.href);
+        if (!urls.includes(primary)) urls.push(primary);
         const hf = new URL(`https://huggingface.co/Joker5800/pixelify/resolve/main/${filename}`);
         hf.searchParams.set('litert', MODEL_ASSET_REVISION);
         if (hf.href !== primary && !urls.includes(hf.href)) {
@@ -62,6 +63,7 @@ function getCandidateUrls(path: string): string[] {
       // ignore parsing errors
     }
   }
+  if (!urls.includes(primary)) urls.unshift(primary);
   return urls;
 }
 
@@ -100,10 +102,21 @@ async function modelBytes(path: string, onProgress?: ModelLoadProgress, signal?:
       const reader = response.body.getReader();
       const chunks: Uint8Array[] = [];
       let received = 0;
+      // Chunk-level heat was re-rendering the entire provider on every 16-64 KB
+      // read (thousands of updates for one model). Report whole percents only.
+      let lastPct = -1;
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        if (value) { chunks.push(value); received += value.length; onProgress?.(Math.min(95, received / total * 95)); }
+        if (value) {
+          chunks.push(value);
+          received += value.length;
+          const pct = Math.round(Math.min(95, received / total * 95));
+          if (pct !== lastPct) {
+            lastPct = pct;
+            onProgress?.(pct);
+          }
+        }
       }
       const bytes = new Uint8Array(received);
       let offset = 0;
@@ -231,7 +244,12 @@ async function createWorkerSession(
       release: () => { worker?.postMessage({ type: 'release' }); worker?.terminate(); session?.model?.delete?.(); pending.clear(); },
     };
     session.fallbackToMainThread = async (reason) => {
-      const mainModel: any = await runtime.loadAndCompile(bytes, { accelerator: 'wasm' });
+      // Re-read the model (usually from the HTTP cache / Cache Storage) instead
+      // of closing over `bytes`. Capturing the buffer pinned the full model —
+      // tens to hundreds of MB — for the whole session even though the worker
+      // already owns its own copy.
+      const mainBytes = await modelBytes(MODELS[key].file);
+      const mainModel: any = await runtime.loadAndCompile(mainBytes, { accelerator: 'wasm' });
       const mainInputs = mainModel.getInputDetails();
       const mainOutputs = mainModel.getOutputDetails();
       if (hasDynamicShape(mainInputs, mainOutputs)) {
@@ -325,10 +343,8 @@ export async function createSession(
   }
 }
 
-/** Adapts CHW/HWC app planes to the model's declared tensor layout and returns an owned CPU copy. */
-export async function runTile(
-  runtime: LiteRtRuntime, session: LiteRtSession, chw: Float32Array, width: number, height: number, channels: number,
-): Promise<Float32Array> {
+/** Resolves the model's declared tile input shape (dynamic dims filled in). */
+function resolveTileLayout(session: LiteRtSession, width: number, height: number, channels: number) {
   const input = session.inputDetails[0];
   const shape = Array.from(input.shape as ArrayLike<number>);
   const nhwc = shape.length === 4 && (shape[3] === channels || (shape[3] < 0 && shape[1] !== channels));
@@ -340,32 +356,38 @@ export async function runTile(
     else if (shape.length === 4) shape[i] = i === 1 ? channels : i === 2 ? height : width;
     else shape[i] = 1;
   }
-  const tensorData = nhwc ? new Float32Array(chw.length) : chw;
-  if (nhwc) {
-    const plane = width * height;
-    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++)
-      for (let c = 0; c < channels; c++) tensorData[(y * width + x) * channels + c] = chw[c * plane + y * width + x];
-  }
+  return { input, shape, nhwc };
+}
+
+/** Runs an already-laid-out tile tensor, rebuilding it if the worker dies mid-run. */
+async function executeTile(
+  runtime: LiteRtRuntime,
+  session: LiteRtSession,
+  tensorData: Float32Array,
+  shape: number[],
+  inputName: string,
+  rebuild: () => Promise<Float32Array>,
+): Promise<Float32Array> {
   if (session.worker) {
-    const copy = tensorData.slice();
     const request = (session as any).request as (message: Record<string, unknown>, transfer?: Transferable[]) => Promise<any>;
     try {
+      // The buffer is ours: transfer it instead of copying the tile again.
       const response = await request({
-        type: 'run', data: copy.buffer, shape, inputName: input.name, outputName: session.outputDetails[0].name,
-      }, [copy.buffer]);
+        type: 'run', data: tensorData.buffer, shape, inputName, outputName: session.outputDetails[0].name,
+      }, [tensorData.buffer]);
       return new Float32Array(response.data);
     } catch (error) {
       if (!session.fallbackToMainThread) throw error;
       console.warn(`LiteRT worker inference failed for ${session.__modelKey}; retrying this model on LiteRT WASM in the page thread.`, error);
       await session.fallbackToMainThread(error);
-      return runTile(runtime, session, chw, width, height, channels);
+      return rebuild();
     }
   }
 
   const inputTensor = new runtime.Tensor(tensorData, shape, 'float32');
   let outputs: any;
   try {
-    outputs = await session.model.run({ [input.name]: inputTensor });
+    outputs = await session.model.run({ [inputName]: inputTensor });
     const outputTensor = Array.isArray(outputs) ? outputs[0] : outputs[session.outputDetails[0].name];
     const cpuTensor = await outputTensor.moveTo('wasm');
     const result = new Float32Array(cpuTensor.toTypedArray() as Float32Array);
@@ -377,4 +399,64 @@ export async function runTile(
     if (outputs && !Array.isArray(outputs)) Object.values(outputs).forEach((tensor: any) => tensor?.delete?.());
     else if (Array.isArray(outputs)) outputs.forEach((tensor: any) => tensor?.delete?.());
   }
+}
+
+/** Adapts CHW/HWC app planes to the model's declared tensor layout and returns an owned CPU copy. */
+export async function runTile(
+  runtime: LiteRtRuntime, session: LiteRtSession, chw: Float32Array, width: number, height: number, channels: number,
+): Promise<Float32Array> {
+  const { input, shape, nhwc } = resolveTileLayout(session, width, height, channels);
+  const tensorData = nhwc ? new Float32Array(chw.length) : chw;
+  if (nhwc) {
+    const plane = width * height;
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++)
+      for (let c = 0; c < channels; c++) tensorData[(y * width + x) * channels + c] = chw[c * plane + y * width + x];
+  }
+  return executeTile(runtime, session, tensorData, shape, input.name, () => runTile(runtime, session, chw, width, height, channels));
+}
+
+/**
+ * Extracts one tile straight out of the full-resolution interleaved (HWC)
+ * planes into the model's tensor layout. This replaces the old HWC copy
+ * followed by a CHW transpose (plus another transpose inside runTile for NHWC
+ * models) with a single write per tile.
+ */
+export async function runTileFromPlanes(
+  runtime: LiteRtRuntime,
+  session: LiteRtSession,
+  planes: Float32Array,
+  srcW: number,
+  srcH: number,
+  x0: number,
+  y0: number,
+  width: number,
+  height: number,
+  channels: number,
+): Promise<Float32Array> {
+  const { input, shape, nhwc } = resolveTileLayout(session, width, height, channels);
+  const plane = width * height;
+  const tensorData = new Float32Array(plane * channels);
+  if (nhwc) {
+    for (let y = 0; y < height; y++) {
+      const sy = Math.min(y0 + y, srcH - 1) * srcW;
+      const dstRow = y * width;
+      for (let x = 0; x < width; x++) {
+        const src = (sy + Math.min(x0 + x, srcW - 1)) * channels;
+        const dst = (dstRow + x) * channels;
+        for (let c = 0; c < channels; c++) tensorData[dst + c] = planes[src + c];
+      }
+    }
+  } else {
+    for (let y = 0; y < height; y++) {
+      const sy = Math.min(y0 + y, srcH - 1) * srcW;
+      for (let x = 0; x < width; x++) {
+        const src = (sy + Math.min(x0 + x, srcW - 1)) * channels;
+        const dst = y * width + x;
+        for (let c = 0; c < channels; c++) tensorData[c * plane + dst] = planes[src + c];
+      }
+    }
+  }
+  return executeTile(runtime, session, tensorData, shape, input.name, () =>
+    runTileFromPlanes(runtime, session, planes, srcW, srcH, x0, y0, width, height, channels),
+  );
 }

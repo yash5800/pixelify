@@ -96,6 +96,8 @@ export interface UpscaleResult {
   enhancementsApplied?: string[];
   /** Object URL of the encoded PNG blob - revocable, no megabyte base64 copies in state. */
   blobUrl?: string;
+  /** Byte size of the lossless PNG master. Downloads re-encode from it. */
+  bytes?: number;
   engine?: 'webgpu' | 'wasm' | 'canvas';
   engineFallback?: boolean;
   engineFallbackReason?: string;

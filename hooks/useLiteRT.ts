@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { MODELS } from '../lib/constants';
 import { loadLiteRT, createSession, isUpscalerModelCached } from '../utils/upscale';
+import { releaseSession } from '../utils/upscaler/sessionLifecycle';
 import type { ModelKey } from '../types';
 
 interface UseLiteRTReturn {
@@ -102,6 +103,11 @@ export function useLiteRT(): UseLiteRTReturn {
       }
     }
 
+    // Reuse the compiled in-memory session. Cache Storage only retains model
+    // bytes; it cannot persist a LiteRT session across page loads. Without this
+    // guard, adding another image recompiles the same model from scratch.
+    if (sessionRef.current?.__modelKey === key) return true;
+
     const generation = sessionGenerationRef.current;
     const controller = new AbortController();
     const background = !!opts?.background;
@@ -115,10 +121,15 @@ export function useLiteRT(): UseLiteRTReturn {
     const showProgressUI = !opts?.silentIfCached || !cached;
 
     const loadPromise = (async () => {
+      let transferStarted = false;
       try {
         if (!runtimeRef.current) await initLiteRT();
+        // Session compilation is real work even when the model bytes are
+        // cached. Track it as preparation; only expose a percentage when the
+        // model file itself needs to transfer.
+        beginTransfer(background);
+        transferStarted = true;
         if (showProgressUI) {
-          beginTransfer(background);
           setModelProgress(0);
         }
         const session = await createSession(
@@ -132,14 +143,19 @@ export function useLiteRT(): UseLiteRTReturn {
           await (session as any).release?.();
           return false;
         }
+        // Release the previous model/worker before adopting the new one;
+        // otherwise every model switch kept a compiled model + WASM heap alive.
+        // A run still using the old session defers the release until it ends.
+        const previous = sessionRef.current;
         sessionRef.current = session;
+        if (previous && previous !== session) releaseSession(previous);
         setExecEngine((session as any).__engine);
         return true;
       } catch (e) {
         if (!controller.signal.aborted) console.error('Failed to load model:', e);
         return false;
       } finally {
-        if (showProgressUI) endTransfer(background);
+        if (transferStarted) endTransfer(background);
       }
     })();
     const load = { promise: loadPromise, controller };
@@ -167,7 +183,8 @@ export function useLiteRT(): UseLiteRTReturn {
     setIsLoading(false);
     setIsPrefetching(false);
     setModelProgress(null);
-    if (session?.release) await session.release();
+    // Defer if a run still owns the session; it will release on completion.
+    if (session) releaseSession(session);
   }, []);
 
   return {

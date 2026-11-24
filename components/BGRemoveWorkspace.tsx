@@ -5,7 +5,7 @@ import UploadArea from './UploadArea';
 import BGComparator, { ImageAdjustments, ImageEffects } from './BGComparator';
 import type { FabricEditMode, FabricCropRatio, FabricImageEditorHandle, SubjectTransform } from './bgremove/FabricImageEditor';
 import { DEFAULT_SUBJECT_TRANSFORM } from './bgremove/FabricImageEditor';
-import { makeId, downloadName } from '../lib/bgUtils';
+import { makeId, downloadName, formatBytes } from '../lib/bgUtils';
 import { bgRemoverService } from '../services/bgRemoverService';
 import { BG_MODELS, DEFAULT_BG_MODEL } from '../lib/constants';
 import type { BGJob, BgModelKey } from '../types';
@@ -569,7 +569,10 @@ export default function BGRemoveWorkspace({
     }
 
     const serviceState = bgRemoverService.getState();
-    const isModelReady = serviceState.isReady;
+    // "Ready" is per model. The pre-warmed Chopper pipeline being ready says
+    // nothing about Diablo, which may still have ~200 MB of weights to fetch,
+    // so a model switch must count as not-ready even while the service is warm.
+    const isModelReady = serviceState.isReady && serviceState.readyModel === modelKey;
 
     let currentProgress = isModelReady ? 20 : 6;
     let currentMessage = isModelReady
@@ -577,6 +580,14 @@ export default function BGRemoveWorkspace({
       : (t.modelLoading?.loadingVisionWeights || 'Loading vision model weights...');
     let lastReportedProgress = currentProgress;
     let lastReportedMessage = currentMessage;
+
+    // Download and processing are exclusive phases. While weights transfer the
+    // download owns the percent and the text; the processing ticker only starts
+    // once the weights are on disk, so the two writers can never fight over the
+    // status pill (the old 51%-download / 96%-processing glitch).
+    let downloadingModel = !isModelReady;
+    let sessionInitializing = false;
+    let weightsStarted = false;
 
     updateJob(job.id, {
       status: isModelReady ? 'processing' : 'loading',
@@ -587,8 +598,36 @@ export default function BGRemoveWorkspace({
       resultBlob: null,
     });
 
+    // Cached-but-not-resident models re-build their session without emitting any
+    // download progress, so give that wait its own small, capped creep instead
+    // of freezing at 6% until inference begins.
+    let prepTicker: ReturnType<typeof setInterval> | null = null;
+    const stopPrepTicker = () => {
+      if (prepTicker !== null) {
+        clearInterval(prepTicker);
+        prepTicker = null;
+      }
+    };
+    if (!isModelReady) {
+      prepTicker = setInterval(() => {
+        if (!downloadingModel || weightsStarted || currentProgress >= 18) {
+          stopPrepTicker();
+          return;
+        }
+        currentProgress = Math.min(18, currentProgress + 0.4);
+        lastReportedProgress = Math.round(currentProgress);
+        updateJob(job.id, {
+          status: 'loading',
+          progress: lastReportedProgress,
+          message: currentMessage,
+        });
+      }, 500);
+    }
+
     let tickerInterval: ReturnType<typeof setInterval> | null = null;
     const startTicker = (startPct: number) => {
+      // Never fabricate processing progress while the model is still downloading.
+      if (downloadingModel) return;
       if (tickerInterval) clearInterval(tickerInterval);
       currentProgress = Math.max(currentProgress, startPct);
 
@@ -603,14 +642,20 @@ export default function BGRemoveWorkspace({
         } else if (currentProgress < 90) {
           increment = isDiablo ? 0.22 : 0.5;
         } else {
-          // Asymptotically inch towards 96% so it never freezes or stays stuck at 92%
-          increment = Math.max(0.06, (96 - currentProgress) * (isDiablo ? 0.035 : 0.07));
+          // Asymptotically inch towards 88% so it never freezes, but never
+          // reaches "Finalizing" - only the worker's real encoding stage is
+          // allowed to claim 95%+, otherwise the pill sat at a fake 96%.
+          increment = Math.max(0.06, (88 - currentProgress) * (isDiablo ? 0.035 : 0.07));
         }
 
-        currentProgress = Math.min(95.8, currentProgress + increment);
+        currentProgress = Math.min(88, currentProgress + increment);
 
         let stageMsg = currentMessage;
-        if (currentProgress < 30) {
+        if (sessionInitializing) {
+          stageMsg = isDiablo
+            ? 'Diablo weights loaded. Initializing neural session...'
+            : 'Model weights loaded. Initializing neural session...';
+        } else if (currentProgress < 30) {
           stageMsg = t.modelLoading?.analyzingContours || 'Analyzing image contours & lighting...';
         } else if (currentProgress < 55) {
           stageMsg = isDiablo
@@ -637,7 +682,7 @@ export default function BGRemoveWorkspace({
             message: stageMsg,
           });
         }
-      }, 120);
+      }, 300);
     };
 
     if (isModelReady) {
@@ -652,28 +697,59 @@ export default function BGRemoveWorkspace({
           if (isDiablo && isWeights) {
             console.log(`[Diablo Model] 📥 Weights loading progress: ${pct}%`);
           }
-          if (isWeights || pct > 0) {
-            const mapped = Math.min(50, Math.max(6, Math.round(6 + pct * 0.44)));
-            currentProgress = Math.max(currentProgress, mapped);
+          // Tokenizer/config files also emit progress ticks; only the weights
+          // transfer should drive the download status. Once processing has
+          // begun, a late or duplicate tick is ignored so it cannot yank the
+          // pill back from processing to "Downloading".
+          if (!isWeights || !downloadingModel) return;
+          weightsStarted = true;
+          stopPrepTicker();
+
+          if (pct >= 100) {
+            downloadingModel = false;
+            sessionInitializing = true;
+            currentProgress = Math.max(currentProgress, 52);
             currentMessage = isDiablo
-              ? (pct < 100 ? `Downloading Diablo model (${pct}%)...` : `Diablo weights loaded. Initializing neural session...`)
-              : `Downloading AI vision model...`;
+              ? 'Diablo weights loaded. Initializing neural session...'
+              : 'Model weights loaded. Initializing neural session...';
             lastReportedProgress = Math.round(currentProgress);
             lastReportedMessage = currentMessage;
             updateJob(job.id, {
-              status: 'loading',
+              status: 'processing',
               progress: lastReportedProgress,
               message: currentMessage,
             });
-            if (pct >= 100) {
-              startTicker(52);
-            }
+            startTicker(52);
+            return;
           }
+
+          const mapped = Math.min(50, Math.max(6, Math.round(6 + pct * 0.44)));
+          currentProgress = Math.max(currentProgress, mapped);
+          currentMessage = isDiablo
+            ? `Downloading Diablo model (${pct}%)...`
+            : `Downloading AI vision model (${pct}%)...`;
+          lastReportedProgress = Math.round(currentProgress);
+          lastReportedMessage = currentMessage;
+          updateJob(job.id, {
+            status: 'loading',
+            progress: lastReportedProgress,
+            message: currentMessage,
+          });
         },
         (stage, msg) => {
           if (isDiablo) {
             console.log(`[Diablo Model] 🔄 Stage: "${stage}" - "${msg || ''}"`);
           }
+          // Stage messages wait for the download to finish; otherwise they
+          // would replace "Downloading model (N%)..." mid-transfer.
+          if (downloadingModel) {
+            // A cached model emits no transfer ticks at all. "running-inference"
+            // is the worker telling us the session is live, so that is the
+            // hand-off point from download UI to processing UI.
+            if (stage !== 'running-inference') return;
+            downloadingModel = false;
+          }
+          stopPrepTicker();
           if (stage === 'reading-image') {
             currentMessage = 'Analyzing image contours & lighting...';
             startTicker(Math.max(currentProgress, 20));
@@ -681,6 +757,7 @@ export default function BGRemoveWorkspace({
             currentMessage = 'Summoning Diablo inference weights...';
             startTicker(Math.max(currentProgress, 28));
           } else if (stage === 'running-inference') {
+            sessionInitializing = false;
             currentMessage = isDiablo
               ? 'Diablo neural edge matting in progress...'
               : 'Neural network segmenting subject...';
@@ -700,6 +777,7 @@ export default function BGRemoveWorkspace({
         }, modelKey
       );
 
+      stopPrepTicker();
       if (tickerInterval) clearInterval(tickerInterval);
 
       if (isDiablo) {
@@ -739,8 +817,9 @@ export default function BGRemoveWorkspace({
       });
       void awardPoint('background_removal', operationId);
 
-      addToast('success', `${job.name} background removed with ${BG_MODELS[modelKey].label}!`);
+      addToast('success', `Background removed: ${job.name} (${BG_MODELS[modelKey].label}).`);
     } catch (err: any) {
+      stopPrepTicker();
       if (tickerInterval) clearInterval(tickerInterval);
       console.error('processJob failed:', err);
       const rawMessage = String(err?.message || '').trim();
@@ -749,8 +828,8 @@ export default function BGRemoveWorkspace({
       const reason = rawMessage ? ` (${rawMessage.slice(0, 200)})` : '';
       const modelLabel = BG_MODELS[modelKey]?.label ?? 'the AI model';
       const userMessage = /webgpu|onnxruntime|ortRun|buffer|adapter|device lost/i.test(rawMessage)
-        ? `Background removal failed. Please try again.`
-        : `Could not remove this background with ${modelLabel}${reason}. Please try another image or retry.`;
+        ? 'Background removal failed. Please try again.'
+        : `Background removal failed for ${modelLabel}${reason}. Try another image or retry.`;
       updateJob(job.id, {
         status: 'error',
         message: userMessage,
@@ -831,7 +910,18 @@ export default function BGRemoveWorkspace({
       return items.filter((item) => item.id !== id);
     });
     if (selectedId === id) setSelectedId(null);
-    addToast('info', 'Image removed from workspace.');
+    addToast('info', 'Removed image from workspace.');
+  }
+
+  /** Clear the whole workspace and release every object URL it owns. */
+  function clearAllJobs() {
+    for (const job of jobs) {
+      autoProcessingIdsRef.current.delete(job.id);
+      URL.revokeObjectURL(job.sourceUrl);
+      if (job.resultUrl && job.resultUrl !== job.sourceUrl) URL.revokeObjectURL(job.resultUrl);
+    }
+    setSelectedId(null);
+    setJobs([]);
   }
 
   // Save manual brush modifications
@@ -1316,6 +1406,8 @@ export default function BGRemoveWorkspace({
 
       // 4. Export Blob
       const mimeType = format === 'jpeg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png';
+      // WebP/JPEG are lossy photo codecs; PNG keeps cutout transparency.
+      const quality = format === 'png' ? undefined : 0.93;
       canvas.toBlob(
         (blob) => {
           if (!blob) throw new Error('Blob creation failed');
@@ -1323,18 +1415,22 @@ export default function BGRemoveWorkspace({
           const a = document.createElement('a');
           a.href = url;
           a.download = downloadName(job.name).replace(/\.png$/, `.${format}`);
+          a.rel = 'noopener';
+          document.body.appendChild(a);
           a.click();
-          URL.revokeObjectURL(url);
+          a.remove();
+          // Revoking immediately can cancel the save in some browsers.
+          setTimeout(() => URL.revokeObjectURL(url), 60_000);
           setIsDownloading(false);
-          addToast('success', 'Download complete!');
+          addToast('success', `Download complete (${formatBytes(blob.size)}).`);
         },
         mimeType,
-        0.95
+        quality
       );
     } catch (err: any) {
       console.error('Download export failed:', err);
       setIsDownloading(false);
-      addToast('error', `Download failed: ${err.message || 'unknown'}`);
+      addToast('error', `Download failed: ${err.message || 'Unknown error'}.`);
     }
   }
 
@@ -1352,7 +1448,7 @@ export default function BGRemoveWorkspace({
 
   const handleUpload = (file: File) => {
     if (file.size > 20 * 1024 * 1024) {
-      addToast('error', 'Please choose images under 20 MB.');
+      addToast('error', 'Selected file exceeds the 20 MB limit.');
       return;
     }
     if (onFileAdd) {
@@ -1374,7 +1470,7 @@ export default function BGRemoveWorkspace({
     setBgModelKey('chopper');
     setJobs((prev) => [...prev, newJob]);
     setSelectedId(newJob.id);
-    addToast('success', `Image "${file.name}" ready for cutout.`);
+    addToast('success', `Image ready: ${file.name}.`);
     setActiveTab('cutout');
   };
 
@@ -1521,7 +1617,7 @@ export default function BGRemoveWorkspace({
       <UploadArea
         onFile={handleUpload}
         isLoading={false}
-        onClear={() => setJobs([])}
+        onClear={clearAllJobs}
         title={t.uploadArea?.cutoutTitle || "Cutout"}
         maxSizeMB={20}
         description={t.uploadArea?.cutoutDesc || "Drop your images here to start cutout\nSelect PNG, JPG, or WebP files under 20MB."}
@@ -1760,7 +1856,15 @@ export default function BGRemoveWorkspace({
               </span>
               {selected?.status === 'done' && (
                 <span className="text-[11px] font-mono px-2.5 py-1 rounded-full bg-[#00FF85]/15 text-[#00FF85] border border-[#00FF85]/30 font-bold">
-                  {t.modelLoading?.cleanCutout || '✓ Clean Cutout'}{selected.model ? ` · ${BG_MODELS[selected.model].label}` : ''}
+                  {t.modelLoading?.cleanCutout || '✓ Clean Cutout'}{selected.model ? ` · ${BG_MODELS[selected.model].label}` : ''}{(() => {
+                    const ms = selected.elapsedMs;
+                    if (!ms || ms <= 0) return '';
+                    const totalSeconds = ms / 1000;
+                    if (totalSeconds < 60) return ` · ${totalSeconds.toFixed(1)}s`;
+                    const minutes = Math.floor(totalSeconds / 60);
+                    const seconds = Math.round(totalSeconds % 60);
+                    return ` · ${minutes}m ${seconds}s`;
+                  })()}
                 </span>
               )}
               {selected?.status === 'ready' && (
@@ -1875,6 +1979,10 @@ export default function BGRemoveWorkspace({
                       <img
                         src={job.resultUrl || job.sourceUrl}
                         alt={job.name}
+                        loading="lazy"
+                        decoding="async"
+                        width={56}
+                        height={56}
                         className="h-full w-full rounded-2xl object-cover bg-[#13141b]"
                       />
                     </button>

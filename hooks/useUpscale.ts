@@ -1,15 +1,17 @@
 import { useCallback } from 'react';
-import { MODELS, MAX_OUTPUT_DIM } from '../lib/constants';
+import { MODELS } from '../lib/constants';
 import {
   extractYCbCr,
   extractRGB,
-  mergeToRgba,
-  rgbaFromTensor,
-  resizeChannel,
+  mergeYCbCrToRgba8,
+  toU8Plane,
+  upscaleChromaPair,
   upscaleWithCanvas,
 } from '../utils/imageProcessing';
 import { runPass, createSession, loadLiteRT } from '../utils/upscale';
 import { processFinalImage } from '../utils/upscaler/postprocess';
+import { beginSessionUse, endSessionUse, releaseSession } from '../utils/upscaler/sessionLifecycle';
+import { checkUpscaleBudget, formatPixels, MAX_SOURCE_PIXELS } from '../utils/memoryBudget';
 import type { ModelKey, UpscaleResult, ProgressState, EnhancementOptions } from '../types';
 
 /* ============================================================
@@ -63,15 +65,40 @@ export function useUpscale({ runtimeRef, sessionRef }: UseUpscaleParams): UseUps
       const finalW = Math.round(img.width * scale);
       const finalH = Math.round(img.height * scale);
 
-      if (finalW > MAX_OUTPUT_DIM || finalH > MAX_OUTPUT_DIM) {
+      // Same admission rule as the UI: file size is checked on upload, and the
+      // source itself may not exceed 32 MP whatever scale is requested.
+      if (img.width * img.height > MAX_SOURCE_PIXELS) {
         throw new Error(
-          `Output would be ${finalW}×${finalH}, exceeding the ${MAX_OUTPUT_DIM}×${MAX_OUTPUT_DIM} limit.`
+          `This image is ${formatPixels(img.width * img.height)}; the upscaler accepts up to 32 MP.`
+        );
+      }
+
+      // Defense in depth: the UI checks this before starting, but a queued or
+      // programmatic run must never allocate beyond the device memory budget.
+      const budget = checkUpscaleBudget(img.width, img.height, scale);
+      if (!budget.ok) {
+        throw new Error(
+          `Output would be ${budget.width}×${budget.height} (${formatPixels(budget.pixels)}), ` +
+          `exceeding the ${formatPixels(budget.maxPixels)} browser memory limit.`
+        );
+      }
+
+      if (process.env.NODE_ENV !== 'production') {
+        console.info(
+          `[Pixelify memory] ${img.width}×${img.height} @${scale}× → ${budget.width}×${budget.height} ` +
+          `(${formatPixels(budget.pixels)}), estimated peak ≈ ${(budget.estimatedPeakBytes / (1024 * 1024)).toFixed(0)} MB`
         );
       }
 
       const start = performance.now();
       const run = { cancelled: false };
       activeRuns.set(id, run);
+      /** Swap the shared session, releasing the previous model/worker immediately. */
+      const swapSession = (next: any) => {
+        const previous = sessionRef.current;
+        sessionRef.current = next;
+        if (previous && previous !== next) releaseSession(previous);
+      };
       let activeSession: any = sessionRef.current?.__modelKey === modelKey ? sessionRef.current : null;
       let latestProgress: ProgressState = { percent: 0, text: '' };
       const reportProgress = (progress: ProgressState) => {
@@ -141,7 +168,7 @@ export function useUpscale({ runtimeRef, sessionRef }: UseUpscaleParams): UseUps
         reportProgress({ percent: 12, text: `Loading ${m.name}… 0%`, stepIndex: 1, totalSteps: steps.length });
         try {
           session = await createSession(runtime, modelKey, undefined, onLoadProgress);
-          sessionRef.current = session;
+          swapSession(session);
           activeSession = session;
           reportProgress(latestProgress);
         } catch (loadErr) {
@@ -157,6 +184,10 @@ export function useUpscale({ runtimeRef, sessionRef }: UseUpscaleParams): UseUps
       let outH = finalH;
 
       if (runtime && session) {
+        // Mark the session as in use. If the user switches models mid-run, the
+        // swap defers the release until this run stops touching the worker.
+        let sessionInUse = session;
+        beginSessionUse(sessionInUse);
         try {
           // Native 4x models. Run 1 pass for 4x and 2x (downscaled after).
           // Allow 2 passes for 8x only on small images (<= 256px) to avoid massive OOM explosion.
@@ -169,6 +200,9 @@ export function useUpscale({ runtimeRef, sessionRef }: UseUpscaleParams): UseUps
           const ctx = tc.getContext('2d', { willReadFrequently: true })!;
           ctx.drawImage(img, 0, 0);
           const fullImg = ctx.getImageData(0, 0, img.width, img.height);
+          // getImageData owns its pixel buffer; release the canvas backing store now.
+          tc.width = 0;
+          tc.height = 0;
 
           let cw = img.width;
           let ch = img.height;
@@ -178,20 +212,33 @@ export function useUpscale({ runtimeRef, sessionRef }: UseUpscaleParams): UseUps
           checkCancelled();
 
           const onSessionUpdated = (newSession: any) => {
+            const previous = sessionInUse;
             session = newSession;
-            sessionRef.current = newSession;
+            // Begin the new session before swapping so the old one is only
+            // released once this run has stopped using it.
+            beginSessionUse(newSession);
+            sessionInUse = newSession;
+            swapSession(newSession);
             activeSession = newSession;
+            endSessionUse(previous);
             reportProgress(latestProgress);
           };
 
           if (m.color === 'rgb') {
-            let data = extractRGB(fullImg);
+            // Only the source planes stay float32. The final pass streams tile
+            // results straight into 8-bit RGBA — no full-resolution float tensor.
+            let planes: Float32Array | null = extractRGB(fullImg);
+            let rgbaOut: Uint8ClampedArray | null = null;
             for (let pass = 0; pass < numPasses; pass++) {
               checkCancelled();
-              data = await runPass(
+              const isLast = pass === numPasses - 1;
+              const passDstW = cw * m.scale;
+              const passDstH = ch * m.scale;
+              if (isLast) rgbaOut = new Uint8ClampedArray(passDstW * passDstH * 4);
+              const result = await runPass(
                 runtime,
                 session,
-                data,
+                planes!,
                 cw,
                 ch,
                 pass,
@@ -205,23 +252,35 @@ export function useUpscale({ runtimeRef, sessionRef }: UseUpscaleParams): UseUps
                     totalSteps: steps.length
                   }),
                 onSessionUpdated,
-                checkCancelled
+                checkCancelled,
+                isLast ? { kind: 'rgba8', data: rgbaOut! } : undefined
               );
-              cw *= m.scale;
-              ch *= m.scale;
+              planes = isLast ? null : result;
+              cw = passDstW;
+              ch = passDstH;
             }
-            rawRgba = rgbaFromTensor(data, cw, ch);
+            rawRgba = rgbaOut!;
             outW = cw;
             outH = ch;
           } else {
+            // Luma is upscaled by the model; chroma stays at source resolution
+            // and is upscaled once at the end (8-bit), instead of allocating
+            // float32 chroma planes at the full output size per pass.
             let { Y, Cb, Cr } = extractYCbCr(fullImg);
+            const chromaSrcW = cw;
+            const chromaSrcH = ch;
+            const cb8 = toU8Plane(Cb);
+            const cr8 = toU8Plane(Cr);
+            Cb = null as unknown as Float32Array;
+            Cr = null as unknown as Float32Array;
+            let yOut: Uint8ClampedArray | null = null;
             for (let pass = 0; pass < numPasses; pass++) {
               checkCancelled();
+              const isLast = pass === numPasses - 1;
               const passDstW = cw * m.scale;
               const passDstH = ch * m.scale;
-              Cb = resizeChannel(Cb, cw, ch, passDstW, passDstH);
-              Cr = resizeChannel(Cr, cw, ch, passDstW, passDstH);
-              Y = await runPass(
+              if (isLast) yOut = new Uint8ClampedArray(passDstW * passDstH);
+              const result = await runPass(
                 runtime,
                 session,
                 Y,
@@ -238,12 +297,15 @@ export function useUpscale({ runtimeRef, sessionRef }: UseUpscaleParams): UseUps
                     totalSteps: steps.length
                   }),
                 onSessionUpdated,
-                checkCancelled
+                checkCancelled,
+                isLast ? { kind: 'y8', data: yOut! } : undefined
               );
+              if (!isLast) Y = result!;
               cw = passDstW;
               ch = passDstH;
             }
-            rawRgba = mergeToRgba(Y, Cb, Cr, cw, ch);
+            const chroma = upscaleChromaPair(cb8, cr8, chromaSrcW, chromaSrcH, cw, ch);
+            rawRgba = mergeYCbCrToRgba8(yOut!, chroma.Cb, chroma.Cr, cw, ch);
             outW = cw;
             outH = ch;
           }
@@ -261,6 +323,8 @@ export function useUpscale({ runtimeRef, sessionRef }: UseUpscaleParams): UseUps
           rawRgba = fallback.rgba;
           outW = fallback.width;
           outH = fallback.height;
+        } finally {
+          endSessionUse(sessionInUse);
         }
       } else {
         console.warn('[useUpscale] LiteRT runtime or session missing!', !!runtime, !!session);
@@ -297,6 +361,7 @@ export function useUpscale({ runtimeRef, sessionRef }: UseUpscaleParams): UseUps
         blobUrl: finalized.blobUrl,
         width: finalized.width,
         height: finalized.height,
+        bytes: finalized.bytes,
         time: elapsed,
         psnrGain,
         detailGain,

@@ -3,6 +3,28 @@
   "version": "1.0.0",
   "description": "AI Photo Editor | BGRemover/Upscaler",
   "type": "module",
+  "contributors": [
+    {
+      "name": "yash5800",
+      "url": "https://github.com/yash5800"
+    },
+    {
+      "name": "Bskn1412",
+      "url": "https://github.com/Bskn1412"
+    },
+    {
+      "name": "Antigravity (Google DeepMind)",
+      "url": "https://deepmind.google"
+    },
+    {
+      "name": "OpenCode",
+      "url": "https://opencode.ai/"
+    },
+    {
+      "name": "Codex (OpenAI)",
+      "url": "https://openai.com"
+    }
+  ],
   "scripts": {
     "copy:litert": "node scripts/copy-litert.js",
     "postinstall": "node scripts/copy-litert.js",
