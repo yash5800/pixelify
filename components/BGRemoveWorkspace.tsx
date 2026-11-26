@@ -581,7 +581,10 @@ export default function BGRemoveWorkspace({
     // so a model switch must count as not-ready even while the service is warm.
     const isModelReady = serviceState.isReady && serviceState.readyModel === modelKey;
 
-    let currentProgress = isModelReady ? 20 : 6;
+    // During model download the pill shows the RAW download percentage (0–100%),
+    // not a fake mapped value. The processing ticker only starts after the
+    // download is fully done, so the two phases can never fight over the pill.
+    let currentProgress = isModelReady ? 20 : 0;
     let currentMessage = isModelReady
       ? (t.modelLoading?.analyzingContours || 'Analyzing image contours & lighting...')
       : (t.modelLoading?.loadingVisionWeights || 'Loading vision model weights...');
@@ -591,7 +594,7 @@ export default function BGRemoveWorkspace({
     // Download and processing are exclusive phases. While weights transfer the
     // download owns the percent and the text; the processing ticker only starts
     // once the weights are on disk, so the two writers can never fight over the
-    // status pill (the old 51%-download / 96%-processing glitch).
+    // status pill.
     let downloadingModel = !isModelReady;
     let sessionInitializing = false;
     let weightsStarted = false;
@@ -605,9 +608,9 @@ export default function BGRemoveWorkspace({
       resultBlob: null,
     });
 
-    // Cached-but-not-resident models re-build their session without emitting any
-    // download progress, so give that wait its own small, capped creep instead
-    // of freezing at 6% until inference begins.
+    // Cached-but-not-resident models rebuild their session without emitting any
+    // download progress ticks, so give that wait a tiny creep (0 → max 15%)
+    // instead of freezing at 0% until inference begins.
     let prepTicker: ReturnType<typeof setInterval> | null = null;
     const stopPrepTicker = () => {
       if (prepTicker !== null) {
@@ -617,11 +620,12 @@ export default function BGRemoveWorkspace({
     };
     if (!isModelReady) {
       prepTicker = setInterval(() => {
-        if (!downloadingModel || weightsStarted || currentProgress >= 18) {
+        // Stop as soon as real weight bytes start flowing or we've reached the cap.
+        if (!downloadingModel || weightsStarted || currentProgress >= 15) {
           stopPrepTicker();
           return;
         }
-        currentProgress = Math.min(18, currentProgress + 0.4);
+        currentProgress = Math.min(15, currentProgress + 0.3);
         lastReportedProgress = Math.round(currentProgress);
         updateJob(job.id, {
           status: 'loading',
@@ -705,41 +709,50 @@ export default function BGRemoveWorkspace({
             console.log(`[Diablo Model] 📥 Weights loading progress: ${pct}%`);
           }
           // Tokenizer/config files also emit progress ticks; only the weights
-          // transfer should drive the download status. Once processing has
-          // begun, a late or duplicate tick is ignored so it cannot yank the
-          // pill back from processing to "Downloading".
-          if (!isWeights || !downloadingModel) return;
+          // transfer should drive the download status pill.
+          if (!isWeights) return;
           weightsStarted = true;
+          downloadingModel = true;
+          if (tickerInterval) {
+            clearInterval(tickerInterval);
+            tickerInterval = null;
+          }
           stopPrepTicker();
 
           if (pct >= 100) {
+            // All bytes received — now the worker compiles the ONNX session.
+            // Do NOT start the processing ticker yet: show 0% with an "Initializing"
+            // message and hold it still. The ticker will only begin when the
+            // 'running-inference' stage fires, confirming inference is actually live.
             downloadingModel = false;
             sessionInitializing = true;
-            currentProgress = Math.max(currentProgress, 52);
+            currentProgress = 0;
             currentMessage = isDiablo
               ? 'Diablo weights loaded. Initializing neural session...'
               : 'Model weights loaded. Initializing neural session...';
-            lastReportedProgress = Math.round(currentProgress);
+            lastReportedProgress = 0;
             lastReportedMessage = currentMessage;
             updateJob(job.id, {
-              status: 'processing',
-              progress: lastReportedProgress,
+              status: 'loading',
+              progress: 0,
               message: currentMessage,
             });
-            startTicker(52);
             return;
           }
 
-          const mapped = Math.min(50, Math.max(6, Math.round(6 + pct * 0.44)));
-          currentProgress = Math.max(currentProgress, mapped);
+          // Show the RAW download percentage directly — no artificial mapping.
+          // This ensures the pill reads "Downloading AI vision model (37%)... 37%"
+          // instead of a fake mapped value like "21%" while the text says "37%".
+          const rawPct = Math.max(0, Math.min(99, Math.round(pct)));
+          currentProgress = rawPct;
           currentMessage = isDiablo
-            ? `Downloading Diablo model (${pct}%)...`
-            : `Downloading AI vision model (${pct}%)...`;
-          lastReportedProgress = Math.round(currentProgress);
+            ? `Downloading Diablo model (${rawPct}%)...`
+            : `Downloading AI vision model (${rawPct}%)...`;
+          lastReportedProgress = rawPct;
           lastReportedMessage = currentMessage;
           updateJob(job.id, {
             status: 'loading',
-            progress: lastReportedProgress,
+            progress: rawPct,
             message: currentMessage,
           });
         },
@@ -759,16 +772,29 @@ export default function BGRemoveWorkspace({
           stopPrepTicker();
           if (stage === 'reading-image') {
             currentMessage = 'Analyzing image contours & lighting...';
-            startTicker(Math.max(currentProgress, 20));
-          } else if (stage === 'loading-diablo') {
-            currentMessage = 'Summoning Diablo inference weights...';
-            startTicker(Math.max(currentProgress, 28));
+            if (isModelReady) {
+              startTicker(Math.max(currentProgress, 20));
+            }
+          } else if (stage === 'loading-diablo' || stage === 'loading-model') {
+            currentMessage = isDiablo
+              ? 'Summoning Diablo inference weights...'
+              : (t.modelLoading?.loadingVisionWeights || 'Loading vision model weights...');
+            lastReportedMessage = currentMessage;
+            updateJob(job.id, {
+              status: 'loading',
+              message: currentMessage,
+            });
           } else if (stage === 'running-inference') {
+            // Inference is live. Only NOW start the processing ticker.
+            // - After a fresh download: sessionInitializing was true → start from 0%
+            // - Cached model (no download ticks, session rebuilt): start from 35%
+            //   so the pill snaps to a sensible point instead of starting at ~15%
+            const wasInitializing = sessionInitializing;
             sessionInitializing = false;
             currentMessage = isDiablo
               ? 'Diablo neural edge matting in progress...'
               : 'Neural network segmenting subject...';
-            startTicker(Math.max(currentProgress, 35));
+            startTicker(wasInitializing ? 0 : Math.max(currentProgress, 35));
           } else if (stage === 'encoding-output') {
             if (tickerInterval) clearInterval(tickerInterval);
             currentProgress = Math.max(currentProgress, 95);

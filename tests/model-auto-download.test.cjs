@@ -33,6 +33,9 @@ function loadModelCache({ storage = createStorage(), cacheNames = [] } = {}) {
     keys: async () => [...cacheNames],
     delete: async (name) => {
       deletedCaches.push(name);
+      const idx = cacheNames.indexOf(name);
+      if (idx !== -1) cacheNames.splice(idx, 1);
+      cacheEntries.delete(name);
       return true;
     },
     open: async (name) => {
@@ -113,6 +116,23 @@ test('clearing still sweeps model weights out of caches it keeps', async () => {
 
   assert.equal(appShell.has(modelRequest), false);
   assert.equal(appShell.has(assetRequest), true);
+});
+
+test('hasAnyCachedModels reports cache presence accurately', async () => {
+  const { api, cacheEntries } = loadModelCache({
+    cacheNames: ['litert-upscaler-models-v2'],
+  });
+
+  assert.equal(await api.hasAnyCachedModels(), false);
+
+  const upscalerCache = new Set();
+  cacheEntries.set('litert-upscaler-models-v2', upscalerCache);
+  upscalerCache.add({ url: 'https://example.com/models/Vitality.tflite' });
+
+  assert.equal(await api.hasAnyCachedModels(), true);
+
+  await api.clearDownloadedModelCaches();
+  assert.equal(await api.hasAnyCachedModels(), false);
 });
 
 test('automatic preload paths are gated and processing paths lift the pause', () => {

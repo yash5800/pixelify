@@ -37,6 +37,7 @@
     "clearModels": "清理模型缓存",
     "clearing": "清理中…",
     "clearModelsDesc": "从当前浏览器中移除已下载的 AI 模型权重文件",
+    "noModelsCached": "当前缓存中没有模型",
     "learnWebgpu": "深入了解 WebGPU",
     "selectLanguage": "选择界面语言"
   },

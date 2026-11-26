@@ -544,7 +544,7 @@ export default function Navbar({
                       onClick={onClearModelCache}
                       disabled={isClearingModelCache || !canClearModelCache}
                       className="flex items-center justify-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.04] px-2 py-2 text-center text-[11px] font-medium text-white/70 hover:bg-white/[0.08] hover:text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-                      title={t.nav.clearModelsDesc}
+                      title={!canClearModelCache && !isClearingModelCache ? (t.nav?.noModelsCached || 'No models currently cached') : t.nav.clearModelsDesc}
                     >
                       <Trash2 size={13} className="shrink-0 text-white/50" />
                       <span className="truncate">{isClearingModelCache ? t.nav.clearing : t.nav.clearModels}</span>

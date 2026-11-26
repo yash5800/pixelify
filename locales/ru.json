@@ -37,6 +37,7 @@
     "clearModels": "Очистить модели",
     "clearing": "Очистка…",
     "clearModelsDesc": "Удалить загруженные модели ИИ из этого браузера",
+    "noModelsCached": "В кэше нет моделей",
     "learnWebgpu": "Подробнее о WebGPU",
     "selectLanguage": "Выбрать язык"
   },

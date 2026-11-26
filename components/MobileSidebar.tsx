@@ -308,7 +308,7 @@ export default function MobileSidebar({
                 onClick={onClearModelCache}
                 disabled={isClearingModelCache || !canClearModelCache}
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-[11px] font-semibold text-neutral-300 transition-colors hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-40 active:scale-[0.98]"
-                title={t.nav.clearModelsDesc}
+                title={!canClearModelCache && !isClearingModelCache ? (t.nav?.noModelsCached || 'No models currently cached') : t.nav.clearModelsDesc}
               >
                 <Trash2 size={13} className={isClearingModelCache ? 'animate-pulse text-white/50' : 'text-white/50'} />
                 <span>{isClearingModelCache ? t.nav.clearing : t.nav.clearModels}</span>

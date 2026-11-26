@@ -32,7 +32,7 @@ import { makeId, formatBytes } from '../lib/bgUtils';
 import { useLiteRT } from '../hooks/useLiteRT';
 import { useUpscale, cancelUpscale } from '../hooks/useUpscale';
 import { bgRemoverService } from '../services/bgRemoverService';
-import { clearDownloadedModelCaches, requestPersistentModelStorage, subscribeToModelCacheCleared, allowModelAutoDownload, isModelAutoDownloadSuppressed, suppressModelAutoDownload } from '../utils/modelCache';
+import { clearDownloadedModelCaches, requestPersistentModelStorage, subscribeToModelCacheCleared, allowModelAutoDownload, isModelAutoDownloadSuppressed, suppressModelAutoDownload, hasAnyCachedModels } from '../utils/modelCache';
 import { buildPresetOptions, getDefaultPreset, MAX_OUTPUT_DIM, MODELS } from '../lib/constants';
 import {
   checkUpscaleBudget,
@@ -314,6 +314,20 @@ export default function AppProvider({ children }: { children: React.ReactNode })
   const [upscalerPreloadError, setUpscalerPreloadError] = useState(false);
   const [modelsCleared, setModelsCleared] = useState(false);
   const [isClearingModelCache, setIsClearingModelCache] = useState(false);
+  const [hasCachedModels, setHasCachedModels] = useState(false);
+
+  const refreshCachedModelsStatus = useCallback(async () => {
+    try {
+      const hasModels = await hasAnyCachedModels();
+      setHasCachedModels(hasModels);
+    } catch {
+      setHasCachedModels(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshCachedModelsStatus();
+  }, [refreshCachedModelsStatus, pathname, modelsCleared, bgModelPhase, execEngine]);
   // Name of the upscaler model currently loading - labels the navbar badge.
   const [upscalerActiveName, setUpscalerActiveName] = useState(MODELS.vitality.name);
   const [upscalerActiveKey, setUpscalerActiveKey] = useState<ModelKey>('vitality');
@@ -510,6 +524,7 @@ export default function AppProvider({ children }: { children: React.ReactNode })
       setBgDownloadActive(false);
       bgRealDownloadRef.current = false;
       setModelsCleared(true);
+      setHasCachedModels(false);
       // The tab that clicked Clear already reports success itself.
       if (source === 'other') addToast('info', 'Downloaded models were cleared in another tab.');
     });
@@ -634,6 +649,7 @@ export default function AppProvider({ children }: { children: React.ReactNode })
       setBgDownloadActive(false);
       bgRealDownloadRef.current = false;
       setModelsCleared(true);
+      setHasCachedModels(false);
       addToast('success', 'Downloaded AI models cleared from this browser.');
     } catch (err) {
       addToast('error', err instanceof Error ? err.message : 'Could not clear downloaded models.');
@@ -1298,9 +1314,12 @@ export default function AppProvider({ children }: { children: React.ReactNode })
                     : modelsCleared
                       ? (ms?.modelsCleared || 'Models cleared; they will download again when needed')
                       : (ms?.preparingBackground || 'Preparing AI models in the background');
-  const canClearModelCache = !bgJobs.some((job) => job.status === 'loading' || job.status === 'processing')
+  const canClearModelCache = Boolean(
+    hasCachedModels
+    && !isClearingModelCache
+    && !bgJobs.some((job) => job.status === 'loading' || job.status === 'processing')
     && !items.some((item) => item.status === 'processing')
-    && !isClearingModelCache;
+  );
 
   const openPicker = useCallback(() => {
     fileInputRef.current?.click();

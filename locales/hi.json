@@ -37,6 +37,7 @@
     "clearModels": "मॉडल हटाएं",
     "clearing": "हटाया जा रहा है…",
     "clearModelsDesc": "इस ब्राउज़र से डाउनलोड किए गए AI मॉडल हटाएं",
+    "noModelsCached": "वर्तमान में कोई मॉडल कैश में नहीं है",
     "learnWebgpu": "WebGPU के बारे में जानें",
     "selectLanguage": "भाषा चुनें"
   },

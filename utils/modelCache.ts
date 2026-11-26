@@ -110,6 +110,46 @@ export async function clearDownloadedModelCaches(): Promise<void> {
   modelCacheSubscribers.forEach((subscriber) => subscriber('self'));
 }
 
+export async function hasAnyCachedModels(): Promise<boolean> {
+  if (typeof window === 'undefined' || typeof caches === 'undefined') return false;
+  try {
+    const allCacheNames: string[] = (await caches.keys().catch(() => [])) as string[];
+    const existingCacheSet = new Set(allCacheNames);
+    const targetCacheNames = new Set<string>([
+      ...MODEL_CACHE_NAMES,
+      ...allCacheNames.filter((name) => /model|transformer|onnx|litert/i.test(name)),
+    ]);
+
+    for (const name of targetCacheNames) {
+      if (!existingCacheSet.has(name)) continue;
+      const cache = await caches.open(name).catch(() => null);
+      if (!cache) continue;
+      const requests = await cache.keys().catch(() => []);
+      if (requests.length === 0) continue;
+
+      for (const req of requests) {
+        const url = (req.url || '').toLowerCase();
+        if (
+          MODEL_URL_PATTERN.test(url) ||
+          url.includes('.tflite') ||
+          url.includes('.onnx') ||
+          url.includes('.safetensors') ||
+          url.includes('.bin') ||
+          url.includes('birefnet') ||
+          url.includes('diablo') ||
+          url.includes('chopper') ||
+          (name !== RUNTIME_CACHE && !url.endsWith('.js') && !url.endsWith('.wasm'))
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export async function isDiabloModelCached(): Promise<boolean> {
   if (typeof window === 'undefined' || typeof caches === 'undefined') return false;
   try {

@@ -37,6 +37,7 @@
     "clearModels": "モデルキャッシュの削除",
     "clearing": "削除中…",
     "clearModelsDesc": "ブラウザ内に保存された AI モデルデータを削除します",
+    "noModelsCached": "キャッシュにモデルはありません",
     "learnWebgpu": "WebGPU について詳しく知る",
     "selectLanguage": "表示言語を選択"
   },

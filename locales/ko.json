@@ -37,6 +37,7 @@
     "clearModels": "모델 캐시 삭제",
     "clearing": "삭제 중…",
     "clearModelsDesc": "브라우저에 다운로드된 AI 모델 데이터를 삭제합니다",
+    "noModelsCached": "현재 캐시된 모델이 없습니다",
     "learnWebgpu": "WebGPU 자세히 알아보기",
     "selectLanguage": "언어 선택"
   },

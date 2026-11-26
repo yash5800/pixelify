@@ -170,7 +170,6 @@ class BGRemoverService {
 
         if (msg.type === 'PROGRESS') {
           this.state.progress = msg.progress;
-          this.state.phase = 'downloading';
 
           if (msg.isWeights) {
             // Weights are (re)transferring, so no model is resident right now.
@@ -179,6 +178,18 @@ class BGRemoverService {
             this.readyModel = null;
             this.state.readyModel = null;
             this.state.isReady = false;
+
+            // Once all bytes have landed (100%), the worker moves to ONNX session
+            // compilation which can take several seconds. Flip to 'preparing' so
+            // the navbar badge disappears immediately at 100% instead of staying
+            // pinned until the READY message finally arrives.
+            this.state.phase = msg.progress >= 100 ? 'preparing' : 'downloading';
+          } else {
+            // Non-weight progress ticks (config files, tokenizers…) should not
+            // override the phase set by the heavyweight weight transfer.
+            if (this.state.phase !== 'preparing' && this.state.phase !== 'ready') {
+              this.state.phase = 'downloading';
+            }
           }
 
           if (msg.model === 'diablo' || msg.model === 'chopper') this.state.model = msg.model;

@@ -30,15 +30,14 @@ async function loadTransformers(preferredUrl?: string): Promise<void> {
 
       // Model weights are fetched from the model repository; no local-model lookup.
       env.allowLocalModels = false;
+      env.useBrowserCache = true;
 
-      // If a custom model weights URL is provided (e.g. from HF_CHOPPER_MODEL),
-      // intercept ONNX model fetches to stream the weights directly from that URL with progress.
+      // Intercept ONNX model fetches to check browser cache, stream download with progress, and cache to transformers-cache.
       const originalFetch = env.fetch || (typeof globalThis.fetch === 'function' ? globalThis.fetch.bind(globalThis) : undefined);
       if (originalFetch) {
         env.fetch = async (input: string | URL | Request, init?: any) => {
           const urlStr = typeof input === 'string' ? input : input instanceof Request ? input.url : input.href;
-          const isWeightsRequest = (modelUrlOverride && (urlStr.endsWith('.onnx') || urlStr.includes('onnx/model'))) ||
-            urlStr.endsWith('chopper.onnx');
+          const isWeightsRequest = urlStr.endsWith('.onnx') || urlStr.includes('onnx/model') || urlStr.endsWith('chopper.onnx');
 
           if (isWeightsRequest) {
             const targetUrl = modelUrlOverride || urlStr;
@@ -219,7 +218,7 @@ type WorkerMessage = {
 
 const MODEL_ID = 'studioludens/birefnet-lite-512';
 const GPU_PROBE_TIMEOUT_MS = 3500;
-const WEBGPU_MODEL_INIT_TIMEOUT_MS = 8000;
+const WEBGPU_MODEL_INIT_TIMEOUT_MS = 15000;
 
 /* ============================================================
    DIABLO - Studio ultra-precision matting network.
@@ -610,8 +609,8 @@ async function getRemover(forceWasm = false): Promise<any> {
  * reset, memory pressure), replace the pipeline with WASM and retry this image
  * exactly once. WASM errors are surfaced rather than retried forever.
  */
-async function runInference(inputBlob: Blob, forceWasm = false): Promise<any> {
-  const remover = await getRemover(forceWasm);
+async function runInference(inputBlob: Blob, forceWasm = false, existingRemover?: any): Promise<any> {
+  const remover = existingRemover || (await getRemover(forceWasm));
   if (chosenEngine === 'webgpu') webgpuTouched = true;
   try {
     return await remover(inputBlob);
@@ -1313,9 +1312,14 @@ async function handleMessage(data: WorkerMessage): Promise<void> {
       post({ type: 'JOB_STAGE', id, stage: 'reading-image', message: 'Analyzing image data...' });
       postStatus('reading-image', { id });
       const inputBlob = await loadInputBlob(url || '');
+
+      post({ type: 'JOB_STAGE', id, stage: 'loading-model', message: 'Loading background-removal model...' });
+      postStatus('loading-model', { id });
+      const remover = await getRemover(forceWasm === true);
+
       post({ type: 'JOB_STAGE', id, stage: 'running-inference', message: 'Neural network segmenting subject...' });
       postStatus('running-inference', { id, engine: chosenEngine });
-      const output = await runInference(inputBlob, forceWasm === true);
+      const output = await runInference(inputBlob, forceWasm === true, remover);
       post({ type: 'JOB_STAGE', id, stage: 'encoding-output', message: 'Refining transparent cutout edges...' });
       postStatus('encoding-output', { id });
       if (!output || typeof output.toBlob !== 'function') {

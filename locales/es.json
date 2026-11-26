@@ -37,6 +37,7 @@
     "clearModels": "Borrar modelos",
     "clearing": "Borrando…",
     "clearModelsDesc": "Eliminar modelos de IA descargados en este navegador",
+    "noModelsCached": "No hay modelos en caché actualmente",
     "learnWebgpu": "Más sobre WebGPU",
     "selectLanguage": "Seleccionar idioma"
   },
