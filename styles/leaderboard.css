@@ -273,7 +273,22 @@
 .lb-state p { margin: 0; color: var(--ink-muted); font-size: 13px; }
 .lb-state button { display: inline-flex; min-height: 38px; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--hairline); border-radius: 999px; background: var(--surface-2); color: #fff; cursor: pointer; }
 .lb-loading { display: grid; gap: 8px; }
-.lb-loading span { height: 64px; border-radius: 12px; background: #181818; animation: lb-skeleton 1.4s ease-in-out infinite alternate; }
+.lb-skeleton-row {
+  display: grid;
+  min-height: 68px;
+  grid-template-columns: 46px 40px minmax(0, 1fr) 88px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 22px 8px 12px;
+  border: 1px solid var(--hairline-soft);
+  border-radius: 12px;
+  background: #181818;
+}
+.lb-loading i { display: block; border-radius: 999px; background: #2a2a2a; animation: lb-skeleton 1.4s ease-in-out infinite alternate; }
+.lb-skeleton-rank { width: 28px; height: 14px; justify-self: center; }
+.lb-skeleton-avatar { width: 40px; height: 40px; border-radius: 50% !important; }
+.lb-skeleton-name { width: min(180px, 65%); height: 12px; }
+.lb-skeleton-score { width: 64px; height: 14px; justify-self: end; }
 @keyframes lb-skeleton { to { opacity: .55; } }
 
 .lb-position { display: grid; grid-template-columns: minmax(250px, .8fr) minmax(0, 1.4fr); gap: 20px; margin: 28px 38px 0; }
@@ -490,6 +505,8 @@
   .leaderboard-page,.activity-page { padding-right: 10px; padding-left: 10px; }
   .lb-hero h1 { font-size: 44px; }
   .lb-player { grid-template-columns: 28px minmax(0, 1fr) 57px; gap: 6px; padding-right: 5px; padding-left: 3px; }
+  .lb-skeleton-row { grid-template-columns: 28px 30px minmax(0, 1fr) 57px; gap: 6px; padding-right: 5px; padding-left: 3px; }
+  .lb-skeleton-avatar { width: 30px; height: 30px; }
   .lb-player-rank img { width: 32px; }
   .lb-avatar { width: 30px; height: 30px; }
   .lb-avatar { flex-basis: 30px; }
@@ -499,7 +516,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .lb-hero-art > img { animation: trophy-soft-drift 3s ease-in-out infinite alternate !important; }
-  .lb-loading span,.activity-skeleton * { animation: none !important; }
+  .lb-loading i,.activity-skeleton * { animation: none !important; }
   .lb-button,.lb-player,.lb-periods button,.lb-bottom-link a,.activity-page * { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
   .lb-profile-card { transform: none; }
 }

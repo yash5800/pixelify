@@ -1,12 +1,16 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import BlogListView from '@/components/BlogListView';
+import { blogIndexAlternates } from '@/lib/seo';
 
 export const metadata: Metadata = {
   title: 'Blog & AI Guides: On-Device AI, Privacy & Upscaling | Pixelify',
   description:
     'In-depth articles about local AI, privacy, background removal, upscaling, WebGPU and how the site runs image processing on-device: no cloud uploads or cross-site tracking.',
-  alternates: { canonical: '/blog/' },
+  alternates: {
+    canonical: '/blog/',
+    languages: blogIndexAlternates(),
+  },
   openGraph: {
     title: 'Blog & Guides · Pixelify',
     description:

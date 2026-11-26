@@ -2,7 +2,13 @@ import type { MetadataRoute } from 'next';
 import { getAllPosts, postPath, LANGUAGES } from '@/data/posts';
 import { articles } from '@/data/docs/docs-data';
 import { SITE_LANGUAGES } from '@/lib/i18n';
-import { SITE_URL } from '@/lib/seo';
+import {
+  SITE_URL,
+  blogIndexAlternates,
+  blogIndexHref,
+  languageAlternates,
+  localizedHref,
+} from '@/lib/seo';
 
 export const dynamic = 'force-static';
 
@@ -18,7 +24,8 @@ const DEFAULT_LANG = 'en';
 
 /**
  * Indexable public pages, roughly in order of importance.
- * Keep this in sync when a new top-level route is added under `app/`.
+ * `/overview/` is an alias of `/docs/` and `/leaderboard/activity/` is
+ * noindex, so neither is listed here.
  */
 const STATIC_ROUTES: RouteConfig[] = [
   { path: '/', changeFrequency: 'weekly', priority: 1 },
@@ -28,10 +35,8 @@ const STATIC_ROUTES: RouteConfig[] = [
   { path: '/docs/', changeFrequency: 'monthly', priority: 0.7 },
   { path: '/products/', changeFrequency: 'monthly', priority: 0.6 },
   { path: '/leaderboard/', changeFrequency: 'daily', priority: 0.5 },
-  { path: '/leaderboard/activity/', changeFrequency: 'daily', priority: 0.4 },
   { path: '/about/', changeFrequency: 'monthly', priority: 0.5 },
   { path: '/story/', changeFrequency: 'monthly', priority: 0.5 },
-  { path: '/overview/', changeFrequency: 'monthly', priority: 0.4 },
   { path: '/contact/', changeFrequency: 'yearly', priority: 0.4 },
   { path: '/privacy/', changeFrequency: 'yearly', priority: 0.3 },
   { path: '/terms/', changeFrequency: 'yearly', priority: 0.3 },
@@ -39,25 +44,47 @@ const STATIC_ROUTES: RouteConfig[] = [
 
 const NON_DEFAULT_LANGUAGES = SITE_LANGUAGES.filter(({ code }) => code !== DEFAULT_LANG);
 
+/**
+ * Docs are English-only, and blog indexes use `/blog/<lang>/` instead of
+ * `/<lang>/blog/`, so neither belongs in the generic localized set.
+ */
+const LOCALIZED_ROUTES = STATIC_ROUTES.filter(
+  ({ path }) => path !== '/docs/' && path !== '/blog/'
+);
+
 const absolute = (path: string) => `${SITE_URL}${path}`;
 
-const localizedPath = (lang: string, path: string) =>
-  path === '/' ? `/${lang}/` : `/${lang}${path}`;
+const absoluteLanguages = (languages: Record<string, string>) =>
+  Object.fromEntries(
+    Object.entries(languages).map(([lang, href]) => [lang, absolute(href)])
+  );
+
+const alternatesFor = (path: string) => {
+  if (path === '/docs/') return undefined;
+  return {
+    languages: absoluteLanguages(
+      path === '/blog/' ? blogIndexAlternates() : languageAlternates(path)
+    ),
+  };
+};
 
 const staticEntries: MetadataRoute.Sitemap = STATIC_ROUTES.map(
   ({ path, changeFrequency, priority }) => ({
     url: absolute(path),
     changeFrequency,
     priority,
+    alternates: alternatesFor(path),
   })
 );
 
-// English is served from the unprefixed routes, so only localize the others.
 const localizedEntries: MetadataRoute.Sitemap = NON_DEFAULT_LANGUAGES.flatMap(({ code }) =>
-  STATIC_ROUTES.map(({ path, changeFrequency, priority }) => ({
-    url: absolute(localizedPath(code, path)),
+  LOCALIZED_ROUTES.map(({ path, changeFrequency, priority }) => ({
+    url: absolute(localizedHref(code, path)),
     changeFrequency,
     priority: Math.max(0.3, Number((priority - 0.2).toFixed(1))),
+    alternates: {
+      languages: absoluteLanguages(languageAlternates(path)),
+    },
   }))
 );
 
@@ -68,14 +95,13 @@ const docsEntries: MetadataRoute.Sitemap = Object.values(articles).map((article)
   priority: article.featured ? 0.7 : 0.6,
 }));
 
-// Localized blog indexes only exist in languages that actually have posts.
-const blogIndexEntries: MetadataRoute.Sitemap = NON_DEFAULT_LANGUAGES
-  .filter(({ code }) => getAllPosts(code).length > 0)
-  .map(({ code }) => ({
-    url: absolute(`/blog/${code}/`),
-    changeFrequency: 'weekly',
-    priority: 0.7,
-  }));
+// Localized blog indexes live at /blog/<lang>/.
+const blogIndexEntries: MetadataRoute.Sitemap = NON_DEFAULT_LANGUAGES.map(({ code }) => ({
+  url: absolute(blogIndexHref(code)),
+  changeFrequency: 'weekly',
+  priority: 0.7,
+  alternates: { languages: absoluteLanguages(blogIndexAlternates()) },
+}));
 
 // Group translations by slug so every post lists its hreflang alternates.
 const postsBySlug = new Map<string, ReturnType<typeof getAllPosts>>();

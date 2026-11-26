@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { motion, useReducedMotion } from 'framer-motion';
@@ -78,6 +78,11 @@ export default function LeaderboardPage() {
   const [error, setError] = useState('');
   const [howOpen, setHowOpen] = useState(false);
   const reduced = useReducedMotion();
+  // Latest-request-wins guard: a slow response for an old period must never
+  // overwrite the rows of the period the user is looking at now.
+  const requestSeqRef = useRef(0);
+  const identityRef = useRef('');
+  const hasBoardRef = useRef(false);
 
   const periodName: Record<Period, string> = {
     all: lb?.periods?.all || 'All time',
@@ -85,31 +90,83 @@ export default function LeaderboardPage() {
     month: lb?.periods?.month || 'This month',
   };
 
-  const load = useCallback(async (range = period) => {
-    setError('');
+  const load = useCallback(async (range: Period = period, options: { skeleton?: boolean } = {}) => {
+    const requestId = ++requestSeqRef.current;
+    if (options.skeleton) {
+      // A period switch must not keep rendering the previous period's rows
+      // while the new ranking is in flight.
+      hasBoardRef.current = false;
+      setBoard(null);
+      setError('');
+    }
     try {
-      const id = await syncVisitorIdentity();
-      setVisitorId(id);
-      const response = await fetch(`/api/leaderboard?period=${range}`, { cache: 'no-store' });
+      let id = identityRef.current;
+      if (!id) {
+        id = await syncVisitorIdentity();
+        identityRef.current = id;
+        if (requestId !== requestSeqRef.current) return;
+        setVisitorId(id);
+      }
+      // Cache-busting param: an older installed service worker may still have
+      // this URL cached from before the API bypass shipped. A unique URL makes
+      // that worker treat the request as a miss and go to the network.
+      const bust = Date.now().toString(36);
+      const response = await fetch(`/api/leaderboard?period=${range}&_=${bust}`, { cache: 'no-store' });
       if (!response.ok) {
         const issue = await response.json().catch(() => null);
         throw new Error(issue?.error || lb?.loadError || 'Leaderboard data could not be loaded right now.');
       }
-      setBoard(await response.json());
-      const activityResponse = await fetch('/api/activity?type=all&period=all&page=1', { cache: 'no-store' });
+      const nextBoard = await response.json();
+      if (requestId !== requestSeqRef.current) return;
+      hasBoardRef.current = true;
+      setBoard(nextBoard);
+      setError('');
+      const activityResponse = await fetch(`/api/activity?type=all&period=all&page=1&_=${bust}`, { cache: 'no-store' });
       if (activityResponse.ok) {
         const data = await activityResponse.json();
-        setActivityCount(data.summary?.total ?? 0);
+        if (requestId === requestSeqRef.current) setActivityCount(data.summary?.total ?? 0);
       }
-    } catch (reason) { setError(reason instanceof Error ? reason.message : (lb?.loadError || 'Leaderboard data could not be loaded right now.')); }
+    } catch (reason) {
+      if (requestId !== requestSeqRef.current) return;
+      // A failed background poll keeps the last good ranking on screen; only
+      // an empty board falls back to the error state.
+      if (!hasBoardRef.current) {
+        setError(reason instanceof Error ? reason.message : (lb?.loadError || 'Leaderboard data could not be loaded right now.'));
+      }
+    }
   }, [period, lb?.loadError]);
 
-  useEffect(() => { void load(); }, [load]);
+  // Initial visit and every period switch load from a skeleton.
+  useEffect(() => { void load(period, { skeleton: true }); }, [load, period]);
+
+  // Keep the board fresh without a manual reload: poll while the tab is
+  // visible, and refresh immediately when it regains focus or is restored
+  // from the back/forward cache.
   useEffect(() => {
-    const refresh = () => { void load(); };
+    const refresh = () => { void load(period); };
+    let lastRefresh = 0;
+    const refreshWhenVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      // Returning to a tab fires focus + visibilitychange + pageshow together;
+      // collapse the burst into one request.
+      const now = Date.now();
+      if (now - lastRefresh < 1500) return;
+      lastRefresh = now;
+      refresh();
+    };
+    const timer = window.setInterval(refreshWhenVisible, 30_000);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    window.addEventListener('focus', refreshWhenVisible);
+    window.addEventListener('pageshow', refreshWhenVisible);
     window.addEventListener('pixelify:reward-update', refresh);
-    return () => window.removeEventListener('pixelify:reward-update', refresh);
-  }, [load]);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      window.removeEventListener('focus', refreshWhenVisible);
+      window.removeEventListener('pageshow', refreshWhenVisible);
+      window.removeEventListener('pixelify:reward-update', refresh);
+    };
+  }, [load, period]);
 
   return <main className="leaderboard-page">
     <div className="lb-atmosphere" aria-hidden="true"><div className="lb-grid" /><Image className="lb-waves" src="/leaderboard/neon-waves.svg" width={1600} height={480} alt="" /></div>
@@ -132,7 +189,7 @@ export default function LeaderboardPage() {
 
       <section className="lb-board glass-panel" aria-labelledby="top-players">
         <header className="lb-board-heading"><Image src="/leaderboard/crown.svg" width={52} height={40} alt="" /><div><h2 id="top-players">{lb?.topUsers || 'Top Users'}</h2><p>{lb?.topUsersSub || 'Community leaders ranked by points'}</p></div><div className="lb-periods" role="group" aria-label="Ranking period">{(['all', 'week', 'month'] as Period[]).map((value) => <button key={value} className={period === value ? 'selected' : ''} onClick={() => setPeriod(value)}>{periodName[value]}</button>)}</div></header>
-        {error ? <div className="lb-state" role="alert"><p>{error}</p><button onClick={() => void load()}><RefreshCw size={15} /> {lb?.tryAgain || 'Try again'}</button></div> : !board ? <div className="lb-loading">{Array.from({ length: 5 }, (_, i) => <span key={i} />)}</div> : board.top.length ? <div className="lb-player-list">{board.top.map((player, index) => <PlayerRow key={player.id} player={player} mine={player.id === visitorId} index={index} reduced={reduced} />)}</div> : <div className="lb-state"><Crown /><strong>{lb?.emptyTitle || 'The board is ready for its first champion.'}</strong><p>{lb?.emptyText || 'Process an image to earn the first point.'}</p></div>}
+        {error ? <div className="lb-state" role="alert"><p>{error}</p><button onClick={() => void load(period, { skeleton: true })}><RefreshCw size={15} /> {lb?.tryAgain || 'Try again'}</button></div> : !board ? <div className="lb-loading" aria-hidden="true">{Array.from({ length: 5 }, (_, i) => <span key={i} className="lb-skeleton-row"><i className="lb-skeleton-rank" /><i className="lb-skeleton-avatar" /><i className="lb-skeleton-name" /><i className="lb-skeleton-score" /></span>)}</div> : board.top.length ? <div className="lb-player-list">{board.top.map((player, index) => <PlayerRow key={player.id} player={player} mine={player.id === visitorId} index={index} reduced={reduced} />)}</div> : <div className="lb-state"><Crown /><strong>{lb?.emptyTitle || 'The board is ready for its first champion.'}</strong><p>{lb?.emptyText || 'Process an image to earn the first point.'}</p></div>}
       </section>
 
       <section className="lb-position" aria-labelledby="your-position">

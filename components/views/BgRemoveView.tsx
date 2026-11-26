@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useApp } from '../AppProvider';
 import Footer from '../Footer';
 import BGRemoveWorkspace from '../BGRemoveWorkspace';
@@ -26,6 +26,17 @@ export default function BgRemoveView() {
   // resident in the renderer; the weights stay cached for an instant reload.
   useEffect(() => () => bgRemoverService.recycleIdleWorker(), []);
 
+  // Stable identity: an inline callback here re-ran the workspace init effect
+  // on every provider render, which could restart the model download right
+  // after the user cleared the cache.
+  const handleEngineReport = useCallback(
+    (engine: 'wasm' | 'webgpu', webgpuAvailable: boolean) => {
+      setBgEngine(engine);
+      setBgWebgpuAvailable(webgpuAvailable);
+    },
+    [setBgEngine, setBgWebgpuAvailable]
+  );
+
   return (
     <div className="flex flex-col gap-8 w-full px-2">
       <DeviceRecommendationNotice tool="bg_remove" />
@@ -36,10 +47,7 @@ export default function BgRemoveView() {
         addToast={addToast}
         onFileAdd={handleBGFiles}
         onOpenPicker={openPicker}
-        onEngineReport={(engine, webgpuAvailable) => {
-          setBgEngine(engine);
-          setBgWebgpuAvailable(webgpuAvailable);
-        }}
+        onEngineReport={handleEngineReport}
       />
       {bgJobs.length === 0 && (
         <>

@@ -3,7 +3,6 @@ import BlogPostView from '@/components/BlogPostView';
 import NotFound from '@/components/NotFound';
 import { getAllPosts, getPostBySlug, postPath, LANGUAGES } from '@/data/posts';
 import { SITE_LANGUAGES } from '@/lib/i18n';
-import { SITE_URL } from '@/lib/seo';
 
 export function generateStaticParams() {
   return SITE_LANGUAGES.flatMap((l) =>
@@ -26,11 +25,15 @@ export async function generateMetadata({
     return { title: 'Article not found | Pixelify' };
   }
 
+  const siblings = LANGUAGES.flatMap((l) => getAllPosts(l.code)).filter((p) => p.slug === slug);
+
   return {
     title: `${post.title} | Pixelify`,
     description: post.description,
     alternates: {
-      canonical: `/${lang}/blog/${slug}/`,
+      // The canonical article family is /blog/<lang>/<slug>/ (English unprefixed).
+      canonical: postPath(post),
+      languages: Object.fromEntries(siblings.map((p) => [p.lang, postPath(p)])),
     },
     openGraph: {
       type: 'article',

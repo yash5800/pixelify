@@ -250,7 +250,7 @@ export function DocsShell({ children }: { children: React.ReactNode }) {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="px-mobile-sidebar-head">
-                <Link href="/overview" className="px-header-brand" onClick={() => setMobileOpen(false)}>
+                <Link href="/docs/" className="px-header-brand" onClick={() => setMobileOpen(false)}>
                   <Logo size="xs" className="shrink-0 pointer-events-none" />
                   <span className="px-header-docs-word">Docs</span>
                 </Link>

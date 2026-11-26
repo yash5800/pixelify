@@ -9,7 +9,7 @@ import { makeId, downloadName, formatBytes } from '../lib/bgUtils';
 import { bgRemoverService } from '../services/bgRemoverService';
 import { BG_MODELS, DEFAULT_BG_MODEL } from '../lib/constants';
 import type { BGJob, BgModelKey } from '../types';
-import { isDiabloModelCached, subscribeToModelCacheCleared } from '../utils/modelCache';
+import { isDiabloModelCached, subscribeToModelCacheCleared, isModelAutoDownloadSuppressed, allowModelAutoDownload } from '../utils/modelCache';
 import {
   TextLayer,
   ElementLayer,
@@ -481,7 +481,11 @@ export default function BGRemoveWorkspace({
     const unsubscribe = bgRemoverService.subscribeEngine((engine, webgpuAvailable) => {
       onEngineReport?.(engine, webgpuAvailable);
     });
-    void bgRemoverService.init();
+    // A mount (or re-render) after the user cleared models must not start the
+    // ~192 MB download by itself; the first process request will load it.
+    if (!isModelAutoDownloadSuppressed()) {
+      void bgRemoverService.init();
+    }
     return unsubscribe;
   }, [onEngineReport]);
 
@@ -549,6 +553,9 @@ export default function BGRemoveWorkspace({
   };
 
   async function processJob(job: BGJob, modelKey: BgModelKey = bgModelKey) {
+    // Processing is the explicit request that may resume downloads after a
+    // cache clear (uploads auto-process through this same path).
+    allowModelAutoDownload();
     const operationId = window.crypto.randomUUID();
     const isDiablo = modelKey === 'diablo';
     if (isDiablo) {

@@ -8,6 +8,9 @@ export function generateStaticParams() {
 export const metadata = {
   title: "Pixelify Docs - Overview",
   description: "Guides, tutorials, and answers for Pixelify's browser-based AI image tools.",
+  // Docs are authored in English only, so every localized alias points at
+  // the English canonical instead of competing with it.
+  alternates: { canonical: "/docs/" },
 };
 
 export default function LocalizedDocsPage() {

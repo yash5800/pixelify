@@ -60,7 +60,7 @@ export function DocsArticlePage({ article }: { article: Article }) {
       >
         <article className="px-article">
           <div className="px-breadcrumb">
-            <Link href="/overview">Docs</Link>
+            <Link href="/docs/">Docs</Link>
             <ChevronRight size={14} />
             <span>{article.category}</span>
           </div>

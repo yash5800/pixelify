@@ -4,7 +4,11 @@ import BlogPostView from '@/components/BlogPostView';
 import BlogListView from '@/components/BlogListView';
 import NotFound from '@/components/NotFound';
 import { getAllPosts, getPostBySlug, postPath, isSupportedLang, langLabel, LANGUAGES } from '@/data/posts';
-import { SITE_URL } from '@/lib/seo';
+import { SITE_URL, blogIndexAlternates, blogIndexHref } from '@/lib/seo';
+
+// Every valid blog URL is enumerated in generateStaticParams; unknown paths
+// should 404 rather than render a soft-not-found page under an arbitrary URL.
+export const dynamicParams = false;
 
 export function generateStaticParams() {
   return [
@@ -44,10 +48,6 @@ function resolve(params: { path: string[] }): Resolved {
   return { post: getPostBySlug(path[1], lang), path, lang };
 }
 
-function langIndexHref(lang: string): string {
-  return isSupportedLang(lang) ? `/blog/${lang}/` : '/blog/';
-}
-
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const resolved = resolve(params);
 
@@ -58,14 +58,14 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
       title: `${langLabel(lang)} blog | Pixelify`,
       description: `In-depth articles about on-device AI, covering background removal, upscaling and privacy-first image tools, in ${langLabel(lang)}: no cloud, no uploads, no tracking.`,
       alternates: {
-        canonical: langIndexHref(lang),
-        languages: Object.fromEntries(LANGUAGES.map((l) => [l.code, langIndexHref(l.code)])),
+        canonical: blogIndexHref(lang),
+        languages: blogIndexAlternates(),
       },
       openGraph: {
         type: 'website',
         title: `${langLabel(lang)} blog | Pixelify`,
         description: `On-device AI articles in ${langLabel(lang)}: no cloud, no uploads, no tracking.`,
-        url: `${SITE_URL}${langIndexHref(lang)}`,
+        url: `${SITE_URL}${blogIndexHref(lang)}`,
         locale: lang,
         images: [{ url: '/blog/settings-engine.jpg', alt: 'Pixelify blog cover' }],
       },

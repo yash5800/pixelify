@@ -32,7 +32,7 @@ import { makeId, formatBytes } from '../lib/bgUtils';
 import { useLiteRT } from '../hooks/useLiteRT';
 import { useUpscale, cancelUpscale } from '../hooks/useUpscale';
 import { bgRemoverService } from '../services/bgRemoverService';
-import { clearDownloadedModelCaches, requestPersistentModelStorage, subscribeToModelCacheCleared } from '../utils/modelCache';
+import { clearDownloadedModelCaches, requestPersistentModelStorage, subscribeToModelCacheCleared, allowModelAutoDownload, isModelAutoDownloadSuppressed, suppressModelAutoDownload } from '../utils/modelCache';
 import { buildPresetOptions, getDefaultPreset, MAX_OUTPUT_DIM, MODELS } from '../lib/constants';
 import {
   checkUpscaleBudget,
@@ -494,7 +494,10 @@ export default function AppProvider({ children }: { children: React.ReactNode })
         setBgDownloadActive(false);
       }
     });
-    const unsubscribeCacheClear = subscribeToModelCacheCleared(() => {
+    const unsubscribeCacheClear = subscribeToModelCacheCleared((source) => {
+      // Another tab may have cleared storage; pause automatic downloads here
+      // too until this tab gets an explicit processing request.
+      suppressModelAutoDownload();
       preloadCancelledRef.current = true;
       bgRemoverService.reset();
       void unloadModel();
@@ -507,7 +510,8 @@ export default function AppProvider({ children }: { children: React.ReactNode })
       setBgDownloadActive(false);
       bgRealDownloadRef.current = false;
       setModelsCleared(true);
-      addToast('info', 'Downloaded models were cleared in another tab.');
+      // The tab that clicked Clear already reports success itself.
+      if (source === 'other') addToast('info', 'Downloaded models were cleared in another tab.');
     });
 
     const gpu = (navigator as any)?.gpu;
@@ -542,6 +546,9 @@ export default function AppProvider({ children }: { children: React.ReactNode })
     const preloadModels = async () => {
       try {
         if (cancelled || preloadCancelledRef.current) return;
+        // Models were cleared and the user has not asked to process anything
+        // yet; do not refill the cache from a route or idle preload.
+        if (isModelAutoDownloadSuppressed()) return;
 
         if (isBgPage) {
           // On background removal route: ONLY pre-warm background remover service
@@ -609,6 +616,9 @@ export default function AppProvider({ children }: { children: React.ReactNode })
 
   const handleClearModelCache = useCallback(async () => {
     if (isClearingModelCache) return;
+    // Pause automatic prefetch immediately so a hover or route effect during
+    // the async purge cannot start refilling the cache.
+    suppressModelAutoDownload();
     preloadCancelledRef.current = true;
     setIsClearingModelCache(true);
     try {
@@ -648,6 +658,8 @@ export default function AppProvider({ children }: { children: React.ReactNode })
   const warmup = useCallback(
     (tab: ViewTab) => {
       try {
+        // Hover intent must not undo a cache clear; only processing downloads.
+        if (isModelAutoDownloadSuppressed()) return;
         if (tab === 'upscaler') {
           // Idle preload already covers all models - don't double-load.
           if (!sessionRef.current && !modelLoading) {
@@ -779,7 +791,12 @@ export default function AppProvider({ children }: { children: React.ReactNode })
       if (autoProcess) {
         pendingAutoUpscaleIdRef.current = newItemId;
       }
-      void loadModel('vitality', { silentIfCached: true, background:true });
+      // Selecting a file is not yet a processing request: when the user has
+      // just cleared the cache, wait for the explicit upscale click instead of
+      // pulling the weights down on upload.
+      if (!isModelAutoDownloadSuppressed()) {
+        void loadModel('vitality', { silentIfCached: true, background:true });
+      }
       scrollToTop();
     };
     img.onerror = () => {
@@ -821,6 +838,9 @@ export default function AppProvider({ children }: { children: React.ReactNode })
       // and drop its pending badge rows.
       preloadCancelledRef.current = true;
       setUpscalerPreloadQueue([]);
+      // After a cache clear, a model choice alone must not download weights;
+      // the upscale action will load the selected model when it runs.
+      if (isModelAutoDownloadSuppressed()) return;
       const ok = await loadModel(key, { silentIfCached: true, background: true });
       if (!ok) {
         addToast('error', `Failed to load ${MODELS[key]?.name || key} model.`);
@@ -898,6 +918,9 @@ export default function AppProvider({ children }: { children: React.ReactNode })
       );
 
       try {
+        // The user explicitly asked to process this image, so normal model
+        // loading (and future prefetching) may resume after a cache clear.
+        allowModelAutoDownload();
         if (!sessionRef.current || sessionRef.current?.__modelKey !== item.modelKey) {
           setActiveUpscalerModel(item.modelKey);
           setItems((prev) =>

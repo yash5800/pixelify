@@ -1,5 +1,5 @@
 // public/sw.js - Pixelify Service Worker for offline resilience
-const CACHE_NAME = 'pixelify-cache-v2';
+const CACHE_NAME = 'pixelify-cache-v4';
 
 // Static resources to cache on install for core offline availability
 const PRECACHE_ASSETS = [
@@ -33,6 +33,24 @@ self.addEventListener('install', (event) => {
   );
 });
 
+// Model weights are persisted by the app in dedicated Cache Storage buckets
+// (litert-upscaler-models-v2, transformers-cache, onnx-models). This service
+// worker must never cache or serve them: the catch-all below used to store
+// every 200 response in CACHE_NAME, so "Clear downloaded models" deleted the
+// app buckets while the SW kept handing the same weights back from
+// pixelify-cache-*, and the model never re-downloaded.
+const MODEL_FILE_PATTERN = /\.(tflite|onnx|onnx_data|safetensors|bin)$/i;
+
+function isModelAsset(url) {
+  if (url.pathname.startsWith('/models/')) return true;
+  if (MODEL_FILE_PATTERN.test(url.pathname)) return true;
+  return (
+    /(^|\.)huggingface\.co$/i.test(url.hostname) &&
+    url.pathname.includes('/resolve/') &&
+    MODEL_FILE_PATTERN.test(url.pathname)
+  );
+}
+
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
@@ -58,6 +76,21 @@ self.addEventListener('fetch', (event) => {
 
   // Only handle HTTP/HTTPS GET requests; ignore chrome-extension or external protocols
   if (request.method !== 'GET' || !url.protocol.startsWith('http')) {
+    return;
+  }
+
+  // Model weights belong to the app's own cache buckets, never to this SW's
+  // app-shell cache. Let the request go straight to the network so clearing
+  // downloaded models actually forces a fresh download.
+  if (isModelAsset(url)) {
+    return;
+  }
+
+  // Dynamic API responses (leaderboard, activity, rewards, identity) must
+  // always come from the network. The stale-while-revalidate branch below used
+  // to store them in the app-shell cache, so the leaderboard rendered the
+  // previous visit's ranking until a reload picked up the background refresh.
+  if (url.pathname.startsWith('/api/')) {
     return;
   }
 

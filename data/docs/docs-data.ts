@@ -34,7 +34,7 @@ export const navGroups: NavGroup[] = [
   {
     title: "OVERVIEW",
     items: [
-      { slug: "overview", label: "Overview", href: "/overview" },
+      { slug: "overview", label: "Overview", href: "/docs/" },
     ],
   },
   {
