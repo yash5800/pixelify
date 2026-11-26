@@ -1105,7 +1105,7 @@ export default function BGComparator({
             images={generationImages}
             revealUrl={job.resultUrl}
             label={job.message || t.modelLoading?.extractingSubject || 'Extracting subject'}
-            percent={isProcessing ? job.progress : null}
+            percent={job.status === 'processing' ? job.progress : null}
             borderRadius={24}
             blockPointerEvents
             onFinished={() => setOverlayHold(false)}
