@@ -19,8 +19,10 @@
    and static gradients. No canvas, no shader, no GPU readback, and
    nothing to download — it paints on the very first frame of a run.
 
-   A status pill (bottom-right, premium blue) shows the live label
-   and percent.
+   A status card (bottom-right) shows the live phase label, the
+   progress stat and a slim progress track. The accent shifts from
+   amber (weights / session prep) to blue (inference) so the two
+   phases read differently at a glance.
    ============================================================ */
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -88,10 +90,13 @@ export interface GenerationOverlayProps {
   images: string[];
   /** Final result — the churn fades out the moment this arrives. */
   revealUrl: string | null;
-  /** Status text for the bottom-right pill. */
+  /** Status text for the bottom-right card. */
   label: string;
-  /** 0–100 progress; null/undefined renders a label-only pill. */
+  /** 0–100 progress; null/undefined renders a label-only card. */
   percent?: number | null;
+  /** Accent for the card: `loading` = weights / session prep (amber),
+      `processing` = inference / encode (blue). Defaults to processing. */
+  phase?: "loading" | "processing";
   /** Corner radius the effect is clipped to (the stage's radius). */
   borderRadius?: number;
   /** Block pointer interaction with the stage beneath (pan / zoom / wheel). */
@@ -105,6 +110,7 @@ export default function GenerationOverlay({
   revealUrl,
   label,
   percent,
+  phase = "processing",
   borderRadius = 16,
   blockPointerEvents = false,
   onFinished,
@@ -161,6 +167,9 @@ export default function GenerationOverlay({
   }, [revealUrl, finish]);
 
   const previousUrl = images[0] ?? null;
+  const progressValue = percent == null
+    ? null
+    : Math.min(100, Math.max(0, Math.round(percent)));
 
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
@@ -181,19 +190,40 @@ export default function GenerationOverlay({
         reducedMotion={reducedMotion}
       />
 
-      {/* STATUS PILL — bottom-right, premium blue */}
-      <div className="absolute bottom-3 right-3 z-20 flex max-w-[calc(100%-24px)] items-center gap-2 rounded-full border border-white/10 bg-black/55 py-1.5 pl-2.5 pr-3 backdrop-blur-md">
-        <span className="relative flex h-1.5 w-1.5 shrink-0">
-          <span className="absolute inset-0 animate-ping rounded-full bg-[var(--generation-blue)] motion-reduce:hidden" />
-          <span className="relative h-1.5 w-1.5 rounded-full bg-[var(--generation-blue)]" />
-        </span>
-        <span className="min-w-0 truncate text-[11px] font-medium leading-none text-white/70">
-          {label}
-        </span>
-        {percent != null && (
-          <span className="shrink-0 font-mono text-[11px] font-bold leading-none tabular-nums text-[var(--generation-blue)]">
-            {Math.min(100, Math.max(0, Math.round(percent)))}%
+      {/* STATUS CARD — bottom-right. Phase line, then stat + track. */}
+      <div
+        data-phase={phase}
+        className="generation-status absolute bottom-3 right-3 z-20 w-[264px] max-w-[calc(100%-24px)] rounded-xl border border-white/10 bg-black/65 px-3 py-2.5 shadow-[0_12px_32px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+      >
+        <div className="flex items-center gap-2">
+          <span aria-hidden="true" className="relative flex h-1.5 w-1.5 shrink-0">
+            <span className="absolute inset-0 animate-ping rounded-full bg-[var(--generation-accent)] motion-reduce:hidden" />
+            <span className="relative h-1.5 w-1.5 rounded-full bg-[var(--generation-accent)]" />
           </span>
+          <span className="min-w-0 flex-1 truncate text-[11px] font-medium leading-none text-white/70">
+            {label}
+          </span>
+        </div>
+        {progressValue != null && (
+          <div className="mt-2 flex items-center gap-2.5">
+            <span className="w-[42px] shrink-0 font-mono text-[15px] font-semibold leading-none tabular-nums text-white">
+              {progressValue}
+              <span className="ml-0.5 align-super text-[9px] font-bold text-white/50">%</span>
+            </span>
+            <div
+              role="progressbar"
+              aria-label={label}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progressValue}
+              className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/10"
+            >
+              <div
+                className="generation-status-fill h-full w-full rounded-full"
+                style={{ transform: `scaleX(${Math.max(0.02, progressValue / 100)})` }}
+              />
+            </div>
+          </div>
         )}
       </div>
     </div>

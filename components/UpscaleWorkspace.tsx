@@ -1054,6 +1054,7 @@ export default function UpscaleWorkspace({
                   revealUrl={generationRevealUrl}
                   label={generationLabel}
                   percent={generationPercent}
+                  phase={modelLoading ? 'loading' : 'processing'}
                   borderRadius={16}
                   onFinished={handleGenerationFinished}
                 />
@@ -1230,6 +1231,7 @@ export default function UpscaleWorkspace({
                 revealUrl={generationRevealUrl}
                 label={generationLabel}
                 percent={generationPercent}
+                phase={modelLoading ? 'loading' : 'processing'}
                 borderRadius={16}
                 onFinished={handleGenerationFinished}
               />

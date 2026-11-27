@@ -1006,45 +1006,48 @@ export default function BGComparator({
             STAGE FLOATING STATUS & CONTROLS PILL
            ========================================================= */}
         <div className="absolute top-4 left-4 right-4 z-40 flex items-center justify-between pointer-events-none">
-          {/* Active Mode Pill Indicator */}
-          <div className="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-xl border border-white/10 text-xs font-semibold text-white shadow-lg">
-            {isCutoutSection && isSpaceHeld ? (
-              <span className="flex items-center gap-1.5 text-blue-400">
-                <span>✋</span> Pan Mode (Space held)
-              </span>
-            ) : isCutoutActive ? (
-              cutoutTool === 'move' ? (
+          {/* Active Mode Pill Indicator — the generation overlay owns the
+              stage while a run is in flight, so mode hints stay out of the way. */}
+          {!isProcessing && (
+            <div className="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-xl border border-white/10 text-xs font-semibold text-white shadow-lg">
+              {isCutoutSection && isSpaceHeld ? (
                 <span className="flex items-center gap-1.5 text-blue-400">
-                  <span>✋</span> Cutout Move / Pan Active
+                  <span>✋</span> Pan Mode (Space held)
+                </span>
+              ) : isCutoutActive ? (
+                cutoutTool === 'move' ? (
+                  <span className="flex items-center gap-1.5 text-blue-400">
+                    <span>✋</span> Cutout Move / Pan Active
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-rose-400">
+                    <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
+                    {cutoutTool === 'erase' ? '✂️ Erase Brush Active' : '✦ Restore Brush Active'}
+                  </span>
+                )
+              ) : isCompareMode ? (
+                <span className="flex items-center gap-1.5 text-blue-400">
+                  <span>[|]</span> Split Compare Active
+                </span>
+              ) : selectedLayerId ? (
+                <span className="flex items-center gap-1.5 text-[#00FF85]">
+                  <span>✨</span> Design Element Selected
+                </span>
+              ) : isCropMode ? (
+                <span className="flex items-center gap-1.5 text-[#00FF85]">
+                  <span><CropIcon /></span> Crop frame active · {cropRatio}
+                </span>
+              ) : (fabricEditMode === 'transform' || activeTab === 'adjust') ? (
+                <span className="flex items-center gap-1.5 text-[#00FF85]">
+                  <span>✋</span> Transform active
                 </span>
               ) : (
-                <span className="flex items-center gap-1.5 text-rose-400">
-                  <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
-                  {cutoutTool === 'erase' ? '✂️ Erase Brush Active' : '✦ Restore Brush Active'}
+                <span className="flex items-center gap-1.5 text-neutral-300">
+                  <span>✋</span> Move & Canvas Active
                 </span>
-              )
-            ) : isCompareMode ? (
-              <span className="flex items-center gap-1.5 text-blue-400">
-                <span>[|]</span> Split Compare Active
-              </span>
-            ) : selectedLayerId ? (
-              <span className="flex items-center gap-1.5 text-[#00FF85]">
-                <span>✨</span> Design Element Selected
-              </span>
-            ) : isCropMode ? (
-              <span className="flex items-center gap-1.5 text-[#00FF85]">
-                <span><CropIcon /></span> Crop frame active · {cropRatio}
-              </span>
-            ) : (fabricEditMode === 'transform' || activeTab === 'adjust') ? (
-              <span className="flex items-center gap-1.5 text-[#00FF85]">
-                <span>✋</span> Transform active
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 text-neutral-300">
-                <span>✋</span> Move & Canvas Active
-              </span>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           {/* Quick Stage Controls */}
           <div className="pointer-events-auto flex items-center gap-2">
@@ -1105,7 +1108,8 @@ export default function BGComparator({
             images={generationImages}
             revealUrl={job.resultUrl}
             label={job.message || t.modelLoading?.extractingSubject || 'Extracting subject'}
-            percent={job.status === 'processing' ? job.progress : null}
+            percent={isProcessing ? job.progress : null}
+            phase={job.status === 'loading' ? 'loading' : 'processing'}
             borderRadius={24}
             blockPointerEvents
             onFinished={() => setOverlayHold(false)}
