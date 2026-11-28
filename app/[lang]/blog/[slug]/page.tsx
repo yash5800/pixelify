@@ -2,10 +2,10 @@ import type { Metadata } from 'next';
 import BlogPostView from '@/components/BlogPostView';
 import NotFound from '@/components/NotFound';
 import { getAllPosts, getPostBySlug, postPath, LANGUAGES } from '@/data/posts';
-import { SITE_LANGUAGES } from '@/lib/i18n';
+import { PREFIXED_LANGUAGES } from '@/lib/i18n';
 
 export function generateStaticParams() {
-  return SITE_LANGUAGES.flatMap((l) =>
+  return PREFIXED_LANGUAGES.flatMap((l) =>
     getAllPosts(l.code).map((p) => ({
       lang: l.code,
       slug: p.slug,

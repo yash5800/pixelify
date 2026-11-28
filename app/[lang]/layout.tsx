@@ -1,10 +1,10 @@
 import { notFound } from 'next/navigation';
-import { SITE_LANGUAGES } from '@/lib/i18n';
+import { PREFIXED_LANGUAGES } from '@/lib/i18n';
 
 export const dynamicParams = false;
 
 export function generateStaticParams() {
-  return SITE_LANGUAGES.map((lang) => ({ lang: lang.code }));
+  return PREFIXED_LANGUAGES.map((lang) => ({ lang: lang.code }));
 }
 
 export default function LangLayout({
@@ -14,7 +14,7 @@ export default function LangLayout({
   children: React.ReactNode;
   params: { lang: string };
 }) {
-  if (!SITE_LANGUAGES.some((l) => l.code === params.lang)) {
+  if (!PREFIXED_LANGUAGES.some((l) => l.code === params.lang)) {
     notFound();
   }
   return <>{children}</>;

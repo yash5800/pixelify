@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import BlogListView from '@/components/BlogListView';
-import { SITE_LANGUAGES, getLanguageInfo } from '@/lib/i18n';
+import { PREFIXED_LANGUAGES, getLanguageInfo } from '@/lib/i18n';
 import { blogIndexAlternates, blogIndexHref } from '@/lib/seo';
 
 export function generateStaticParams() {
-  return SITE_LANGUAGES.map((lang) => ({ lang: lang.code }));
+  return PREFIXED_LANGUAGES.map((lang) => ({ lang: lang.code }));
 }
 
 export async function generateMetadata({

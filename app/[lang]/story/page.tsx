@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 import StoryView from '@/components/StoryView';
-import { SITE_LANGUAGES } from '@/lib/i18n';
+import { PREFIXED_LANGUAGES } from '@/lib/i18n';
 import { localizedHref } from '@/lib/seo';
 
 export function generateStaticParams() {
-  return SITE_LANGUAGES.map((lang) => ({ lang: lang.code }));
+  return PREFIXED_LANGUAGES.map((lang) => ({ lang: lang.code }));
 }
 
 export async function generateMetadata({

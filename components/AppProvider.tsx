@@ -246,8 +246,6 @@ export default function AppProvider({ children }: { children: React.ReactNode })
       }
       if (!langPrefix && currentLang && currentLang !== DEFAULT_LANGUAGE) {
         langPrefix = `/${currentLang}`;
-      } else if (!langPrefix && currentLang === DEFAULT_LANGUAGE && pathname && pathname.startsWith('/en/')) {
-        langPrefix = '/en';
       }
 
       let targetPath = '';

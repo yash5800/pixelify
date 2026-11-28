@@ -3,11 +3,11 @@ import { notFound } from "next/navigation";
 import { DocsArticlePage } from "@/components/docs/docs-article-page";
 import { DocsHome } from "@/components/docs/docs-home";
 import { articles } from "@/data/docs/docs-data";
-import { SITE_LANGUAGES } from "@/lib/i18n";
+import { PREFIXED_LANGUAGES } from "@/lib/i18n";
 
 export function generateStaticParams() {
   const slugs = [...Object.keys(articles), "overview"];
-  return SITE_LANGUAGES.flatMap((l) =>
+  return PREFIXED_LANGUAGES.flatMap((l) =>
     slugs.map((slug) => ({ lang: l.code, slug }))
   );
 }

@@ -25,6 +25,15 @@ export const SITE_LANGUAGES: LanguageOption[] = [
 
 export const DEFAULT_LANGUAGE = 'en';
 
+/**
+ * Languages that get a URL prefix. English is served from the unprefixed
+ * routes (`/`, `/upscaler/`, `/bg_remove/`), so `/en/...` must never be
+ * generated as a real route.
+ */
+export const PREFIXED_LANGUAGES = SITE_LANGUAGES.filter(
+  (lang) => lang.code !== DEFAULT_LANGUAGE
+);
+
 export const LANGUAGE_STORAGE_KEY = 'pixelify_lang_pref';
 
 /** Helper to get language info by code */

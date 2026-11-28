@@ -4,7 +4,7 @@ import type { ViewTab } from '../types';
 import Logo from './Logo';
 import { EngineRow } from './Navbar';
 import { useApp } from './AppProvider';
-import { SITE_LANGUAGES } from '../lib/i18n';
+import { SITE_LANGUAGES, DEFAULT_LANGUAGE } from '../lib/i18n';
 import { useTranslation } from '../locales';
 import { getSavedDisplayName, requestDisplayNameEdit, VISITOR_PROFILE_UPDATED_EVENT } from '@/lib/visitor-profile';
 import Link from 'next/link';
@@ -108,7 +108,15 @@ export default function MobileSidebar({
     }
 
     const restPath = segments.join('/');
-    const target = restPath ? `/${newLang}/${restPath}/` : `/${newLang}/`;
+    // English lives at the unprefixed routes: `/`, `/upscaler/`, not `/en/...`.
+    const target =
+      newLang === DEFAULT_LANGUAGE
+        ? restPath
+          ? `/${restPath}/`
+          : '/'
+        : restPath
+          ? `/${newLang}/${restPath}/`
+          : `/${newLang}/`;
     router.push(target);
   }, [pathname, router, setCurrentLang, onClose]);
   const navItems = [

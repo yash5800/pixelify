@@ -1,6 +1,11 @@
 import { SITE_LANGUAGES } from '@/lib/i18n';
 
-export const SITE_URL = 'https://pixelify.me';
+/**
+ * Canonical origin. Must match the host Vercel actually serves.
+ * Vercel currently serves www and 308-redirects the apex to it, so pointing
+ * canonicals/sitemap at the apex made every canonical URL redirect.
+ */
+export const SITE_URL = 'https://www.pixelify.me';
 export const SITE_NAME = 'Pixelify';
 
 /**

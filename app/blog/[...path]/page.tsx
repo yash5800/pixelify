@@ -10,21 +10,18 @@ import { SITE_URL, blogIndexAlternates, blogIndexHref } from '@/lib/seo';
 // should 404 rather than render a soft-not-found page under an arbitrary URL.
 export const dynamicParams = false;
 
+/** English blog URLs are unprefixed (`/blog/`), so never generate `/blog/en/`. */
+const PREFIXED_BLOG_LANGUAGES = LANGUAGES.filter((lang) => lang.code !== 'en');
+
 export function generateStaticParams() {
   return [
-    // /blog/<lang> - localized index pages (plus /blog/en/ as a permalink)
-    ...LANGUAGES.map((lang) => ({ path: [lang.code] })),
+    // /blog/<lang> - localized index pages (English lives at /blog/)
+    ...PREFIXED_BLOG_LANGUAGES.map((lang) => ({ path: [lang.code] })),
     // /blog/<slug> - English articles
     ...getAllPosts('en').map((post) => ({ path: [post.slug] })),
-    // /blog/<lang>/<slug> - translations (plus /blog/en/<slug> for legacy links)
-    ...LANGUAGES.flatMap((l) =>
-      getAllPosts(l.code).flatMap((post) => {
-        const segments = [{ path: [post.lang, post.slug] }];
-        if (post.lang === 'en') {
-          segments.push({ path: ['en', post.slug] });
-        }
-        return segments;
-      })
+    // /blog/<lang>/<slug> - translated articles
+    ...PREFIXED_BLOG_LANGUAGES.flatMap((l) =>
+      getAllPosts(l.code).map((post) => ({ path: [post.lang, post.slug] }))
     ),
   ];
 }

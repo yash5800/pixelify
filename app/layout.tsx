@@ -6,6 +6,7 @@ import LeaderboardRewardFeedback from '@/components/LeaderboardRewardFeedback';
 import VisitorNameDialog from '@/components/VisitorNameDialog';
 import TopProgressBar from '@/components/TopProgressBar';
 import { Analytics } from '@vercel/analytics/next';
+import { SITE_URL } from '@/lib/seo';
 
 import '@/styles/index.css';
 import '@/styles/app.css';
@@ -16,8 +17,6 @@ import '@/styles/bgremove-sections.css';
 import '@/styles/docs.css';
 import '@/styles/leaderboard.css';
 import '@/styles/generation-overlay.css';
-
-const SITE_URL = 'https://pixelify.me';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -96,25 +95,25 @@ const structuredData = {
   '@graph': [
     {
       '@type': 'WebSite',
-      '@id': 'https://pixelify.me/#website',
-      url: 'https://pixelify.me/',
+      '@id': `${SITE_URL}/#website`,
+      url: `${SITE_URL}/`,
       name: 'Pixelify',
       description: 'Free on-device AI image upscaler and background remover running privately in the browser.',
       inLanguage: 'en-US',
       publisher: {
         '@type': 'Organization',
         name: 'Pixelify',
-        url: 'https://pixelify.me/',
+        url: `${SITE_URL}/`,
         logo: {
           '@type': 'ImageObject',
-          url: 'https://pixelify.me/favicon.svg',
+          url: `${SITE_URL}/favicon.svg`,
         },
       },
     },
     {
       '@type': 'WebApplication',
-      '@id': 'https://pixelify.me/#webapp',
-      url: 'https://pixelify.me/',
+      '@id': `${SITE_URL}/#webapp`,
+      url: `${SITE_URL}/`,
       name: 'Pixelify AI Photo Editor',
       applicationCategory: 'MultimediaApplication',
       operatingSystem: 'All modern browsers (Chrome, Edge, Firefox, Safari)',
@@ -131,7 +130,7 @@ const structuredData = {
         'Zero Cloud Uploads & Absolute Privacy',
         'Side-by-side Before/After Comparison Slider',
       ],
-      image: 'https://pixelify.me/og-image.jpg',
+      image: `${SITE_URL}/og-image.jpg`,
     },
   ],
 };

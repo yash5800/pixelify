@@ -1,8 +1,8 @@
 import { DocsHome } from "@/components/docs/docs-home";
-import { SITE_LANGUAGES } from '@/lib/i18n';
+import { PREFIXED_LANGUAGES } from '@/lib/i18n';
 
 export function generateStaticParams() {
-  return SITE_LANGUAGES.map((lang) => ({ lang: lang.code }));
+  return PREFIXED_LANGUAGES.map((lang) => ({ lang: lang.code }));
 }
 
 export const metadata = {
